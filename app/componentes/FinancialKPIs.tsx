@@ -3,8 +3,8 @@
 import { ArrowTrendingUpIcon, ArrowTrendingDownIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 
 interface FinancialKPIsProps {
-  totalRevenue: number;   // Vem dos agendamentos
-  totalExpenses: number;  // Vem das transações manuais
+  totalRevenue: number;
+  totalExpenses: number;
 }
 
 export function FinancialKPIs({ totalRevenue, totalExpenses }: FinancialKPIsProps) {
@@ -40,9 +40,8 @@ export function FinancialKPIs({ totalRevenue, totalExpenses }: FinancialKPIsProp
         </div>
       </div>
 
-      {/* Card Saldo Líquido */}
+      {/* Card Saldo Líquido (CORRIGIDO: Removido o círculo decorativo) */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between relative overflow-hidden">
-        <div className={`absolute right-0 top-0 w-16 h-16 transform translate-x-4 -translate-y-4 rounded-full opacity-10 ${isPositive ? 'bg-blue-500' : 'bg-red-500'}`}></div>
         <div>
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Saldo Líquido</p>
           <p className={`text-2xl font-bold mt-1 ${isPositive ? 'text-blue-600' : 'text-red-600'}`}>
