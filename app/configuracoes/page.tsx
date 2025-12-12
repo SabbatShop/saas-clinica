@@ -9,7 +9,8 @@ import {
   CameraIcon, 
   MapPinIcon,
   LockClosedIcon,
-  EnvelopeIcon
+  EnvelopeIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 
 export default function SettingsPage() {
@@ -52,7 +53,6 @@ export default function SettingsPage() {
     loadProfile();
   }, [router]);
 
-  // --- SALVAR PERFIL ---
   async function handleSaveProfile() {
     setSavingProfile(true);
     try {
@@ -86,14 +86,13 @@ export default function SettingsPage() {
     }
   }
 
-  // --- ALTERAR SENHA ---
   async function handleChangePassword() {
     if (!newPassword || newPassword.length < 6) return toast.error('Senha muito curta.');
     setSavingSecurity(true);
     try {
         const { error } = await supabase.auth.updateUser({ password: newPassword });
         if (error) throw error;
-        toast.success('Senha alterada com sucesso!');
+        toast.success('Senha alterada!');
         setNewPassword('');
     } catch (error: any) {
         toast.error('Erro ao mudar senha.');
@@ -102,14 +101,13 @@ export default function SettingsPage() {
     }
   }
 
-  // --- ALTERAR EMAIL ---
   async function handleChangeEmail() {
     if (!newEmail || !newEmail.includes('@')) return toast.error('E-mail inválido.');
     setSavingSecurity(true);
     try {
         const { error } = await supabase.auth.updateUser({ email: newEmail });
         if (error) throw error;
-        toast.success('Verifique o NOVO e o ANTIGO e-mail para confirmar a troca!');
+        toast.success('Verifique seus e-mails (novo e antigo)!');
         setNewEmail('');
     } catch (error: any) {
         toast.error('Erro ao mudar e-mail.');
@@ -128,26 +126,33 @@ export default function SettingsPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center text-blue-600">Carregando...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+    // Ajuste de Padding (py-6 no mobile, py-12 no PC) e Overflow hidden
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-6 sm:py-12 px-4 sm:px-6 lg:px-8 font-sans overflow-x-hidden">
       
       <div className="w-full max-w-2xl space-y-6">
         
         <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-gray-200 rounded-full text-gray-600"><ArrowLeftIcon className="w-5 h-5" /></button>
-          <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
+          <button onClick={() => router.back()} className="p-2 hover:bg-gray-200 rounded-full text-gray-600 transition-colors">
+            <ArrowLeftIcon className="w-5 h-5" />
+          </button>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Configurações</h1>
         </div>
 
         {/* --- CARD PERFIL --- */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        {/* Ajuste de Padding interno (p-4 no mobile, p-8 no PC) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-8">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Perfil da Clínica</h2>
           
-          <div className="flex flex-col md:flex-row gap-8 items-start">
+          <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
              <div className="flex flex-col items-center gap-2">
-                <div className="relative group cursor-pointer w-24 h-24">
+                <div className="relative group cursor-pointer w-24 h-24 flex-shrink-0">
                   <div className="w-24 h-24 rounded-full border-4 border-gray-100 overflow-hidden bg-gray-100 flex items-center justify-center">
                     {previewUrl || avatarUrl ? <img src={previewUrl || avatarUrl || ''} className="w-full h-full object-cover" /> : <span className="text-2xl text-gray-300 font-bold">{clinicName?.charAt(0) || 'C'}</span>}
                   </div>
-                  <label className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"><CameraIcon className="w-8 h-8" /><input type="file" hidden accept="image/*" onChange={handleFileSelect} /></label>
+                  <label className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white">
+                    <CameraIcon className="w-8 h-8" />
+                    <input type="file" hidden accept="image/*" onChange={handleFileSelect} />
+                  </label>
                 </div>
                 <span className="text-xs text-gray-400">Alterar Logo</span>
              </div>
@@ -155,19 +160,17 @@ export default function SettingsPage() {
              <div className="flex-1 w-full space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Clínica</label>
-                    {/* CORREÇÃO: Adicionado text-gray-900 */}
                     <input type="text" value={clinicName} onChange={e => setClinicName(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 px-4 bg-gray-50 text-gray-900" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cidade (para documentos)</label>
                     <div className="relative">
                         <MapPinIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-                        {/* CORREÇÃO: Adicionado text-gray-900 */}
                         <input type="text" value={city} onChange={e => setCity(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 pl-10 pr-4 bg-gray-50 text-gray-900" />
                     </div>
                 </div>
-                <div className="pt-2 flex justify-end">
-                    <button onClick={handleSaveProfile} disabled={savingProfile} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-all disabled:opacity-70">
+                <div className="pt-2 flex justify-end w-full">
+                    <button onClick={handleSaveProfile} disabled={savingProfile} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 sm:py-2 px-6 rounded-xl sm:rounded-lg transition-all disabled:opacity-70 flex justify-center items-center gap-2">
                         {savingProfile ? 'Salvando...' : 'Salvar Dados'}
                     </button>
                 </div>
@@ -176,34 +179,32 @@ export default function SettingsPage() {
         </div>
 
         {/* --- CARD SEGURANÇA --- */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-8">
             <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <LockClosedIcon className="w-5 h-5 text-gray-500" /> Segurança da Conta
+                <LockClosedIcon className="w-5 h-5 text-gray-500" /> Segurança
             </h2>
 
             <div className="space-y-6">
                 {/* Trocar Senha */}
                 <div className="pb-6 border-b border-gray-100">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Redefinir Senha</label>
-                    <div className="flex gap-3">
-                        {/* CORREÇÃO: Adicionado text-gray-900 */}
-                        <input type="password" placeholder="Nova senha segura" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="flex-1 rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 px-4 bg-gray-50 text-gray-900 placeholder-gray-400" />
-                        <button onClick={handleChangePassword} disabled={savingSecurity || !newPassword} className="bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg disabled:opacity-50">Atualizar</button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <input type="password" placeholder="Nova senha" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="flex-1 rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 px-4 bg-gray-50 text-gray-900 placeholder-gray-400" />
+                        <button onClick={handleChangePassword} disabled={savingSecurity || !newPassword} className="bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 sm:py-2 px-4 rounded-xl sm:rounded-lg disabled:opacity-50">Atualizar</button>
                     </div>
                 </div>
 
                 {/* Trocar Email */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Alterar E-mail de Acesso</label>
-                    <div className="flex gap-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Alterar E-mail</label>
+                    <div className="flex flex-col sm:flex-row gap-3">
                         <div className="relative flex-1">
                              <EnvelopeIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-                             {/* CORREÇÃO: Adicionado text-gray-900 */}
                              <input type="email" placeholder="Novo e-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 pl-10 px-4 bg-gray-50 text-gray-900 placeholder-gray-400" />
                         </div>
-                        <button onClick={handleChangeEmail} disabled={savingSecurity || !newEmail} className="bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg disabled:opacity-50">Alterar</button>
+                        <button onClick={handleChangeEmail} disabled={savingSecurity || !newEmail} className="bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 sm:py-2 px-4 rounded-xl sm:rounded-lg disabled:opacity-50">Alterar</button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">Você receberá um link de confirmação no e-mail novo e no antigo.</p>
+                    <p className="text-xs text-gray-500 mt-2">Você receberá um link de confirmação.</p>
                 </div>
             </div>
         </div>
