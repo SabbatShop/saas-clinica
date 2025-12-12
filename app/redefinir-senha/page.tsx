@@ -4,22 +4,24 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'; // <--- ÍCONES
 
 export default function RedefinirSenhaPage() {
   const router = useRouter();
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState(''); // <--- NOVO
+  const [showPassword, setShowPassword] = useState(false); // <--- NOVO
+  
   const [loading, setLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
 
   useEffect(() => {
-    // 1. Escuta o evento de login
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
         setIsVerifying(false);
       }
     });
 
-    // 2. Fallback de segurança
     const timer = setTimeout(async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -46,6 +48,13 @@ export default function RedefinirSenhaPage() {
       return;
     }
 
+    // --- VALIDAÇÃO NOVA ---
+    if (password !== confirmPassword) {
+      toast.error('As senhas não coincidem.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.updateUser({
         password: password
@@ -56,21 +65,11 @@ export default function RedefinirSenhaPage() {
       toast.success('Senha atualizada com sucesso!');
       router.push('/'); 
     } catch (error: any) {
-      console.error(error);
-      
-      // --- TRADUÇÃO DE ERROS ---
       let msg = error.message;
-
-      if (msg.includes('New password should be different from the old password')) {
-        msg = 'A nova senha não pode ser igual à antiga.';
-      } else if (msg.includes('Password should be at least 6 characters')) {
-        msg = 'A senha deve ter no mínimo 6 caracteres.';
-      } else if (msg.includes('weak_password')) {
-        msg = 'A senha é muito fraca. Escolha uma mais segura.';
-      } else {
-        msg = 'Erro ao atualizar senha. Tente novamente.';
-      }
-
+      if (msg.includes('New password should be different')) msg = 'A nova senha não pode ser igual à antiga.';
+      else if (msg.includes('weak_password')) msg = 'Senha muito fraca.';
+      else msg = 'Erro ao atualizar senha.';
+      
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -93,19 +92,43 @@ export default function RedefinirSenhaPage() {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-gray-100 text-center">
         
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Criar Nova Senha</h2>
-        <p className="text-sm text-gray-500 mb-6">Digite sua nova senha abaixo para recuperar o acesso.</p>
+        <p className="text-sm text-gray-500 mb-6">Digite sua nova senha abaixo.</p>
 
-        <form onSubmit={handleUpdatePassword} className="space-y-4">
-          <div className="text-left">
+        <form onSubmit={handleUpdatePassword} className="space-y-4 text-left">
+          
+          {/* Senha Nova */}
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                required
+                minLength={6}
+                className="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-3 px-4 bg-gray-50 text-gray-900 pr-10"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirmar Senha */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar Nova Senha</label>
             <input 
-              type="password" 
+              type={showPassword ? "text" : "password"} 
               required
-              minLength={6}
               className="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-3 px-4 bg-gray-50 text-gray-900"
               placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </div>
 

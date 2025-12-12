@@ -7,21 +7,23 @@ import toast from 'react-hot-toast';
 import { 
   EyeIcon, 
   EyeSlashIcon,
-  ArrowLeftIcon 
+  ArrowLeftIcon,
+  MapPinIcon // <--- Ícone novo para cidade
 } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isRecovery, setIsRecovery] = useState(false); // <--- NOVO ESTADO
+  const [isRecovery, setIsRecovery] = useState(false);
   
   // Dados do Formulário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState(''); // <--- NOVO
   const [clinicName, setClinicName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [city, setCity] = useState(''); // <--- NOVO
+  const [showPassword, setShowPassword] = useState(false); // <--- NOVO
   
   // --- FUNÇÃO DE RECUPERAÇÃO DE SENHA ---
   async function handleRecovery(e: React.FormEvent) {
@@ -29,17 +31,16 @@ export default function LoginPage() {
     setLoading(true);
     
     try {
-      // O link redireciona para a página de redefinição que vamos criar
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/redefinir-senha`,
       });
 
       if (error) throw error;
 
-      toast.success('Link de recuperação enviado para o seu e-mail!');
-      setIsRecovery(false); // Volta para o login
+      toast.success('Link enviado! Verifique seu e-mail (e a caixa de Spam).');
+      setIsRecovery(false); 
     } catch (error: any) {
-      toast.error('Erro ao enviar e-mail: ' + error.message);
+      toast.error('Erro: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -50,10 +51,18 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    if (isSignUp && password !== confirmPassword) {
-      toast.error("As senhas não coincidem.");
-      setLoading(false);
-      return;
+    // --- VALIDAÇÕES NOVAS ---
+    if (isSignUp) {
+        if (password !== confirmPassword) {
+            toast.error("As senhas não coincidem.");
+            setLoading(false);
+            return;
+        }
+        if (!city.trim()) {
+            toast.error("Por favor, informe sua cidade.");
+            setLoading(false);
+            return;
+        }
     }
 
     if (password.length < 6) {
@@ -64,6 +73,7 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
+        // --- CADASTRO ---
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
@@ -76,23 +86,22 @@ export default function LoginPage() {
         }
 
         if (authData.user) {
+          // Agora salvamos também a CIDADE
           const { error: profileError } = await supabase
             .from('profiles')
             .upsert({
               id: authData.user.id,
               clinic_name: clinicName,
+              city: city, // <--- SALVANDO CIDADE
             }, { onConflict: 'id' });
 
           if (profileError) console.error(profileError);
 
-          toast.success('Conta criada! Verifique seu e-mail.'); // Confirmação de email geralmente necessária
-          setTimeout(() => {
-             // Dependendo da config do Supabase, pode logar direto ou pedir confirmação
-             // Aqui assumimos fluxo padrão
-          }, 2000);
+          toast.success('Conta criada! Verifique seu e-mail.'); 
         }
 
       } else {
+        // --- LOGIN ---
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -107,7 +116,7 @@ export default function LoginPage() {
       let msg = error.message;
       if (msg === 'User already registered') msg = 'Este e-mail já possui cadastro.';
       if (msg === 'Invalid login credentials') msg = 'E-mail ou senha incorretos.';
-      toast.error(msg || 'Ocorreu um erro desconhecido.');
+      toast.error(msg || 'Ocorreu um erro.');
     } finally {
       setLoading(false);
     }
@@ -118,6 +127,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex bg-white font-sans">
       
+      {/* LADO ESQUERDO (Formulário) */}
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24 bg-white z-10">
         <div className="mx-auto w-full max-w-sm lg:w-96">
           
@@ -139,13 +149,33 @@ export default function LoginPage() {
           </div>
 
           <div>
-            {/* --- FORMULÁRIO --- */}
             <form onSubmit={isRecovery ? handleRecovery : handleAuth} className="space-y-6">
               
+              {/* CAMPOS EXTRAS DE CADASTRO */}
               {isSignUp && !isRecovery && (
-                <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Nome da Clínica</label>
-                  <input type="text" required={isSignUp} value={clinicName} onChange={e => setClinicName(e.target.value)} className={inputClasses} placeholder="Ex: Clínica Saúde Total" />
+                <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Nome da Clínica</label>
+                    <input type="text" required={isSignUp} value={clinicName} onChange={e => setClinicName(e.target.value)} className={inputClasses} placeholder="Ex: Clínica Saúde Total" />
+                  </div>
+                  
+                  {/* CAMPO CIDADE */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Cidade</label>
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <MapPinIcon className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input 
+                            type="text" 
+                            required={isSignUp} 
+                            value={city} 
+                            onChange={e => setCity(e.target.value)} 
+                            className={`${inputClasses} pl-10`} 
+                            placeholder="Ex: São Paulo" 
+                        />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -168,19 +198,41 @@ export default function LoginPage() {
                       </button>
                     )}
                   </div>
+                  
+                  {/* CAMPO DE SENHA COM OLHINHO */}
                   <div className="relative">
-                    <input type={showPassword ? "text" : "password"} required={!isRecovery} minLength={6} value={password} onChange={e => setPassword(e.target.value)} className={`${inputClasses} pr-10`} placeholder="••••••••" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
+                    <input 
+                        type={showPassword ? "text" : "password"} 
+                        required={!isRecovery} 
+                        minLength={6} 
+                        value={password} 
+                        onChange={e => setPassword(e.target.value)} 
+                        className={`${inputClasses} pr-10`} 
+                        placeholder="••••••••" 
+                    />
+                    <button 
+                        type="button" 
+                        onClick={() => setShowPassword(!showPassword)} 
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
                       {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                     </button>
                   </div>
                 </div>
               )}
 
+              {/* CAMPO CONFIRMAR SENHA */}
               {isSignUp && !isRecovery && (
                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                    <label className="block text-sm font-semibold text-gray-700 mb-1">Confirmar Senha</label>
-                   <input type="password" required={isSignUp} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputClasses} placeholder="Repita a senha" />
+                   <input 
+                    type="password" // Mantive password aqui pra não poluir, mas validação existe
+                    required={isSignUp} 
+                    value={confirmPassword} 
+                    onChange={e => setConfirmPassword(e.target.value)} 
+                    className={inputClasses} 
+                    placeholder="Repita a senha" 
+                   />
                  </div>
               )}
 
@@ -209,6 +261,7 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {/* LADO DIREITO (Imagem/Marketing) - MANTIDO IGUAL */}
       <div className="hidden lg:block relative w-0 flex-1 bg-gray-900">
         <img className="absolute inset-0 h-full w-full object-cover opacity-60 mix-blend-overlay" src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80" alt="Medical Background" />
         <div className="absolute inset-0 bg-gradient-to-t from-blue-900 via-blue-900/40 to-transparent"></div>
