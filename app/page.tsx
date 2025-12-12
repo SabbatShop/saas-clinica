@@ -14,7 +14,7 @@ import { RevenueChart } from './componentes/RevenueChart';
 import { SearchBar } from './componentes/SearchBar';
 import { PatientHistoryModal } from './componentes/PatientHistoryModal';
 import { FinancialKPIs } from './componentes/FinancialKPIs';
-import { DocumentModal } from './componentes/DocumentModal'; // <--- MODAL DE DOCUMENTOS
+import { DocumentModal } from './componentes/DocumentModal';
 
 import { format, isSameDay, getYear, getMonth, getHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,7 +42,7 @@ export default function Home() {
   // Busca
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Usuário e Perfil (Agora com cidade)
+  // Usuário e Perfil
   const [userId, setUserId] = useState<string>('');
   const [profile, setProfile] = useState<{ clinic_name: string, avatar_url: string | null, city: string } | null>(null);
 
@@ -51,7 +51,7 @@ export default function Home() {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [historyPatientName, setHistoryPatientName] = useState<string | null>(null);
-  const [documentPatient, setDocumentPatient] = useState<string | null>(null); // Estado para o modal de documentos
+  const [documentPatient, setDocumentPatient] = useState<string | null>(null);
 
   // Saudação
   const hour = getHours(new Date());
@@ -69,7 +69,6 @@ export default function Home() {
       
       setUserId(session.user.id);
       
-      // Busca perfil (incluindo a cidade)
       const { data: profileData } = await supabase
         .from('profiles')
         .select('clinic_name, avatar_url, city')
@@ -174,7 +173,6 @@ export default function Home() {
     }
   };
 
-  // --- FUNÇÃO DO WHATSAPP MELHORADA ---
   function openWhatsApp(e: React.MouseEvent, phone: string | undefined, patientName: string, startTime: string) {
     e.stopPropagation(); 
     
@@ -230,7 +228,6 @@ export default function Home() {
                 <span className="text-xs text-gray-400">{format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}</span>
              </div>
              
-             {/* Botão Financeiro */}
              <button title="Gestão Financeira" onClick={() => router.push('/financeiro')} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all">
                 <BanknotesIcon className="w-6 h-6" />
              </button>
@@ -271,7 +268,6 @@ export default function Home() {
           currentUserId={userId}
         />
 
-        {/* --- MODAL DE DOCUMENTOS --- */}
         <DocumentModal 
           isOpen={!!documentPatient} 
           onClose={() => setDocumentPatient(null)} 
@@ -297,7 +293,6 @@ export default function Home() {
           {/* COLUNA DIREITA */}
           <div className="flex-1 min-w-0">
             
-            {/* KPI FINANCEIRO */}
             {!searchTerm && (
               <FinancialKPIs 
                 totalRevenue={financialTotals.totalRevenue} 
@@ -305,7 +300,6 @@ export default function Home() {
               />
             )}
 
-            {/* CONTROLES */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -380,15 +374,20 @@ export default function Home() {
                           >
                             <div className="flex justify-between items-start">
                               <div>
-                                <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+                                <h3 className="font-bold text-gray-800 text-lg flex flex-wrap items-center gap-2">
                                   {item.patient_name}
+                                  
+                                  {/* --- BOTÃO WHATSAPP MELHORADO --- */}
                                   {item.patient_phone && (
                                     <button
                                       onClick={(e) => openWhatsApp(e, item.patient_phone, item.patient_name, format(new Date(item.start_time), 'HH:mm'))}
-                                      className="text-green-500 hover:text-green-600 bg-green-50 p-1 rounded-full transition-colors"
+                                      className="flex items-center gap-1 text-green-700 bg-green-100 hover:bg-green-200 border border-green-200 px-3 py-1.5 rounded-lg transition-all"
                                       title="Chamar no WhatsApp"
                                     >
-                                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2z"/></svg>
+                                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2z"/>
+                                      </svg>
+                                      <span className="text-xs font-bold">WhatsApp</span>
                                     </button>
                                   )}
                                 </h3>
@@ -407,7 +406,6 @@ export default function Home() {
                                     Ver Prontuário &rarr;
                                   </button>
 
-                                  {/* --- BOTÃO DE IMPRIMIR --- */}
                                   <button 
                                     onClick={(e) => { e.stopPropagation(); setDocumentPatient(item.patient_name); }}
                                     className="text-xs font-medium text-gray-500 hover:text-gray-800 hover:underline flex items-center gap-1"
