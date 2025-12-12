@@ -9,15 +9,31 @@ export default function RedefinirSenhaPage() {
   const router = useRouter();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(true);
 
-  // Se o usuário cair aqui sem estar logado (link expirado ou acesso direto), manda pro login
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        toast.error('Link inválido ou expirado.');
-        router.push('/login');
+    // 1. Escuta o evento de login
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
+        setIsVerifying(false);
       }
     });
+
+    // 2. Fallback de segurança
+    const timer = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+         toast.error('Link inválido ou expirado.');
+         router.push('/login');
+      } else {
+         setIsVerifying(false);
+      }
+    }, 4000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, [router]);
 
   async function handleUpdatePassword(e: React.FormEvent) {
@@ -38,12 +54,38 @@ export default function RedefinirSenhaPage() {
       if (error) throw error;
 
       toast.success('Senha atualizada com sucesso!');
-      router.push('/'); // Manda pro Dashboard
+      router.push('/'); 
     } catch (error: any) {
-      toast.error('Erro ao atualizar senha: ' + error.message);
+      console.error(error);
+      
+      // --- TRADUÇÃO DE ERROS ---
+      let msg = error.message;
+
+      if (msg.includes('New password should be different from the old password')) {
+        msg = 'A nova senha não pode ser igual à antiga.';
+      } else if (msg.includes('Password should be at least 6 characters')) {
+        msg = 'A senha deve ter no mínimo 6 caracteres.';
+      } else if (msg.includes('weak_password')) {
+        msg = 'A senha é muito fraca. Escolha uma mais segura.';
+      } else {
+        msg = 'Erro ao atualizar senha. Tente novamente.';
+      }
+
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
+  }
+
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-blue-600 font-bold">
+         <div className="flex flex-col items-center gap-2">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <span>Verificando segurança...</span>
+         </div>
+      </div>
+    );
   }
 
   return (
