@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 import { 
   ArrowLeftIcon, 
   CameraIcon, 
-  CheckCircleIcon,
   MapPinIcon,
   LockClosedIcon,
   EnvelopeIcon
@@ -156,13 +155,15 @@ export default function SettingsPage() {
              <div className="flex-1 w-full space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Clínica</label>
-                    <input type="text" value={clinicName} onChange={e => setClinicName(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 px-4 bg-gray-50" />
+                    {/* CORREÇÃO: Adicionado text-gray-900 */}
+                    <input type="text" value={clinicName} onChange={e => setClinicName(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 px-4 bg-gray-50 text-gray-900" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cidade (para documentos)</label>
                     <div className="relative">
                         <MapPinIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-                        <input type="text" value={city} onChange={e => setCity(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 pl-10 pr-4 bg-gray-50" />
+                        {/* CORREÇÃO: Adicionado text-gray-900 */}
+                        <input type="text" value={city} onChange={e => setCity(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 pl-10 pr-4 bg-gray-50 text-gray-900" />
                     </div>
                 </div>
                 <div className="pt-2 flex justify-end">
@@ -185,7 +186,8 @@ export default function SettingsPage() {
                 <div className="pb-6 border-b border-gray-100">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Redefinir Senha</label>
                     <div className="flex gap-3">
-                        <input type="password" placeholder="Nova senha segura" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="flex-1 rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 px-4 bg-gray-50" />
+                        {/* CORREÇÃO: Adicionado text-gray-900 */}
+                        <input type="password" placeholder="Nova senha segura" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="flex-1 rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 px-4 bg-gray-50 text-gray-900 placeholder-gray-400" />
                         <button onClick={handleChangePassword} disabled={savingSecurity || !newPassword} className="bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg disabled:opacity-50">Atualizar</button>
                     </div>
                 </div>
@@ -196,7 +198,8 @@ export default function SettingsPage() {
                     <div className="flex gap-3">
                         <div className="relative flex-1">
                              <EnvelopeIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-                             <input type="email" placeholder="Novo e-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 pl-10 px-4 bg-gray-50" />
+                             {/* CORREÇÃO: Adicionado text-gray-900 */}
+                             <input type="email" placeholder="Novo e-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full rounded-xl border-gray-300 shadow-sm focus:ring-blue-500 py-2.5 pl-10 px-4 bg-gray-50 text-gray-900 placeholder-gray-400" />
                         </div>
                         <button onClick={handleChangeEmail} disabled={savingSecurity || !newEmail} className="bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg disabled:opacity-50">Alterar</button>
                     </div>
