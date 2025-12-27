@@ -1,441 +1,491 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { getMonthlyAppointments, Appointment } from './services/appointmentService';
-import { getTransactions, Transaction } from './services/transactionService';
-
-// Componentes
-import { CalendarWidget } from './componentes/CalendarWidget';
-import { NewAppointmentModal } from './componentes/NewAppointmentModal';
-import { NewTransactionModal } from './componentes/NewTransactionModal';
-import { RevenueChart } from './componentes/RevenueChart';
-import { SearchBar } from './componentes/SearchBar';
-import { PatientHistoryModal } from './componentes/PatientHistoryModal';
-import { FinancialKPIs } from './componentes/FinancialKPIs';
-import { DocumentModal } from './componentes/DocumentModal';
-
-import { format, isSameDay, getYear, getMonth, getHours } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import toast from 'react-hot-toast';
 import { 
-  ArrowRightOnRectangleIcon, 
-  Cog6ToothIcon,
-  CheckBadgeIcon,
-  BanknotesIcon,
-  PrinterIcon 
-} from '@heroicons/react/24/outline';
+  CheckCircle, 
+  Calendar, 
+  DollarSign, 
+  ShieldCheck, 
+  Smartphone, 
+  Clock,
+  ArrowRight,
+  Star,
+  Menu,
+  X,
+  Zap,
+  TrendingUp,
+  Users,
+  FileText,
+  BarChart3
+} from 'lucide-react';
 
-export default function Home() {
+export default function LandingPage() {
   const router = useRouter();
-  
-  // --- ESTADOS DE DADOS ---
-  const [agendamentos, setAgendamentos] = useState<Appointment[]>([]);
-  const [transacoes, setTransacoes] = useState<Transaction[]>([]);
-  
-  // Datas
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [currentMonthDate, setCurrentMonthDate] = useState<Date>(new Date());
-  const [loading, setLoading] = useState(true);
-  
-  // Busca
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Usuário e Perfil
-  const [userId, setUserId] = useState<string>('');
-  const [profile, setProfile] = useState<{ clinic_name: string, avatar_url: string | null, city: string } | null>(null);
-
-  // Modais
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
-  const [historyPatientName, setHistoryPatientName] = useState<string | null>(null);
-  const [documentPatient, setDocumentPatient] = useState<string | null>(null);
-
-  // Saudação
-  const hour = getHours(new Date());
-  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-
-  // --- EFEITOS (Data Fetching) ---
-  useEffect(() => {
-    async function checkUser() {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        router.push('/login');
-        return;
-      } 
-      
-      setUserId(session.user.id);
-      
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('clinic_name, avatar_url, city')
-        .eq('id', session.user.id)
-        .single();
-      
-      if (profileData) {
-        setProfile({
-            clinic_name: profileData.clinic_name,
-            avatar_url: profileData.avatar_url,
-            city: profileData.city || 'Sua Cidade'
-        });
-      } else {
-        setProfile({ clinic_name: 'Minha Clínica', avatar_url: null, city: 'Sua Cidade' });
-      }
-
-      fetchData(currentMonthDate, session.user.id);
-    }
-    checkUser();
-  }, [router]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    if (userId) {
-      fetchData(currentMonthDate, userId);
-    }
-  }, [currentMonthDate, userId]);
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push('/login');
-  }
-
-  async function fetchData(dateToFetch: Date, uid: string) {
-    if (!uid) return;
-    setLoading(true);
-    const year = getYear(dateToFetch);
-    const month = getMonth(dateToFetch) + 1;
-
-    try {
-      const [appointmentsData, transactionsData] = await Promise.all([
-        getMonthlyAppointments(year, month, uid),
-        getTransactions(month, year, uid)
-      ]);
-
-      setAgendamentos(appointmentsData || []);
-      setTransacoes(transactionsData || []);
-
-    } catch (err) {
-      console.error("Erro ao buscar dados:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleMonthChange(newDate: Date) {
-    setCurrentMonthDate(newDate);
-  }
-
-  // --- CÁLCULOS FINANCEIROS (MENSAL) ---
-  const financialTotals = useMemo(() => {
-    const revenueFromAppointments = agendamentos
-      .filter(app => app.status === 'concluido')
-      .reduce((acc, curr) => acc + curr.price, 0);
-
-    const otherIncome = transacoes
-      .filter(t => t.type === 'income')
-      .reduce((acc, curr) => acc + curr.amount, 0);
-
-    const expenses = transacoes
-      .filter(t => t.type === 'expense')
-      .reduce((acc, curr) => acc + curr.amount, 0);
-
-    return {
-      totalRevenue: revenueFromAppointments + otherIncome,
-      totalExpenses: expenses
-    };
-  }, [agendamentos, transacoes]);
-
-
-  // --- HELPERS VISUAIS (Diário) ---
-  const todayAppointments = agendamentos.filter(app => isSameDay(new Date(app.start_time), selectedDate));
-  
-  const displayedAppointments = searchTerm 
-    ? agendamentos.filter(app => app.patient_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    : todayAppointments;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmado': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'concluido': return 'bg-green-100 text-green-700 border-green-200';
-      case 'cancelado': return 'bg-red-100 text-red-700 border-red-200';
-      default: return 'bg-amber-100 text-amber-700 border-amber-200';
-    }
-  };
-
-  const getStatusDot = (status: string) => {
-    switch (status) {
-      case 'confirmado': return 'bg-blue-500';
-      case 'concluido': return 'bg-green-500';
-      case 'cancelado': return 'bg-red-500';
-      default: return 'bg-amber-400';
-    }
-  };
-
-  function openWhatsApp(e: React.MouseEvent, phone: string | undefined, patientName: string, startTime: string) {
-    e.stopPropagation(); 
-    
-    if (!phone) {
-        toast.error("Paciente sem telefone cadastrado.");
-        return;
-    }
-    
-    const cleanPhone = phone.replace(/\D/g, ''); 
-    const dateFormatted = format(new Date(selectedDate), "dd/MM", { locale: ptBR });
-    const clinicName = profile?.clinic_name || 'Consultório';
-
-    const message = `Olá, *${patientName}*! Tudo bem? 👋` +
-      `%0a%0a` + 
-      `Aqui é da *${clinicName}*.` +
-      `%0a%0a` +
-      `Gostaríamos de confirmar sua consulta para:` +
-      `%0a📅 Data: *${dateFormatted}*` +
-      `%0a⏰ Horário: *${startTime}*` +
-      `%0a%0a` +
-      `Podemos confirmar?`;
-
-    window.open(`https://wa.me/55${cleanPhone}?text=${message}`, '_blank');
-  }
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
-    <main className="bg-gray-50 min-h-screen font-sans text-gray-900 pb-10">
+    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/20 to-white font-sans text-gray-900 overflow-x-hidden">
       
-      {/* HEADER */}
-      <header className="bg-white sticky top-0 z-30 shadow-sm mb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shadow-sm relative bg-gray-100">
-               {profile?.avatar_url ? (
-                 <img src={profile.avatar_url} alt="Logo" className="w-full h-full object-cover"/>
-               ) : (
-                 <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white font-bold">
-                   {profile?.clinic_name?.charAt(0) || 'C'}
-                 </div>
-               )}
-             </div>
-             <div>
-                <h1 className="text-sm font-bold text-gray-900 leading-tight">
-                  {profile?.clinic_name || 'Minha Clínica'}
-                </h1>
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Painel Médico</p>
-             </div>
-          </div>
+      {/* NAVBAR MODERNA */}
+      <nav className={`fixed w-full z-50 transition-all duration-300 ${
+        scrolled ? 'bg-white/90 backdrop-blur-xl shadow-lg shadow-gray-200/50' : 'bg-transparent'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-20">
+            <div className="flex items-center gap-3 group cursor-pointer">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-blue-200 group-hover:shadow-xl group-hover:shadow-blue-300 transition-all transform group-hover:scale-105">
+                M
+              </div>
+              <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                MedControl
+              </span>
+            </div>
 
-          <div className="flex items-center gap-2 md:gap-4">
-             <div className="hidden md:flex flex-col items-end mr-2">
-                <span className="text-sm font-medium text-gray-700">{greeting}</span>
-                <span className="text-xs text-gray-400">{format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}</span>
-             </div>
-             
-             <button title="Gestão Financeira" onClick={() => router.push('/financeiro')} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all">
-                <BanknotesIcon className="w-6 h-6" />
-             </button>
+            {/* Desktop Menu */}
+            <div className="hidden md:flex items-center gap-8">
+              <a href="#recursos" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">Recursos</a>
+              <a href="#precos" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">Preços</a>
+              <a href="#depoimentos" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">Depoimentos</a>
+              <button 
+                onClick={() => router.push('/login')}
+                className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                Entrar
+              </button>
+              <button 
+                onClick={() => router.push('/login')}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300 transform hover:-translate-y-0.5"
+              >
+                Começar Grátis
+              </button>
+            </div>
 
-             <button title="Configurações" onClick={() => router.push('/configuracoes')} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all">
-                <Cog6ToothIcon className="w-6 h-6" />
-             </button>
-             <button title="Sair" onClick={handleLogout} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all">
-                <ArrowRightOnRectangleIcon className="w-6 h-6" />
-             </button>
+            {/* Mobile Menu Button */}
+            <button 
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* MODAIS */}
-        <NewAppointmentModal 
-          isOpen={isModalOpen}
-          onClose={() => { setIsModalOpen(false); setEditingAppointment(null); }}
-          selectedDate={selectedDate}
-          appointmentToEdit={editingAppointment}
-          onSuccess={() => fetchData(currentMonthDate, userId)}
-          currentUserId={userId}
-        />
-        
-        <NewTransactionModal 
-          isOpen={isTransactionModalOpen}
-          onClose={() => setIsTransactionModalOpen(false)}
-          onSuccess={() => fetchData(currentMonthDate, userId)}
-          currentUserId={userId}
-        />
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-white border-t border-gray-100 shadow-xl">
+            <div className="px-4 py-6 space-y-4">
+              <a href="#recursos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-blue-600 font-medium">Recursos</a>
+              <a href="#precos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-blue-600 font-medium">Preços</a>
+              <a href="#depoimentos" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600 hover:text-blue-600 font-medium">Depoimentos</a>
+              <button 
+                onClick={() => router.push('/login')}
+                className="block w-full text-left text-gray-600 hover:text-blue-600 font-medium"
+              >
+                Entrar
+              </button>
+              <button 
+                onClick={() => router.push('/login')}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg"
+              >
+                Começar Grátis
+              </button>
+            </div>
+          </div>
+        )}
+      </nav>
 
-        <PatientHistoryModal 
-          isOpen={!!historyPatientName}
-          onClose={() => setHistoryPatientName(null)}
-          patientName={historyPatientName || ''}
-          currentUserId={userId}
-        />
+      {/* HERO SECTION REDESENHADA */}
+      <section className="pt-32 pb-20 lg:pt-40 lg:pb-32 relative overflow-hidden">
+        {/* Background Melhorado */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-400/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+          <div className="absolute top-40 right-1/4 w-96 h-96 bg-purple-400/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
+          <div className="absolute -bottom-8 left-1/2 w-96 h-96 bg-pink-400/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+        </div>
 
-        <DocumentModal 
-          isOpen={!!documentPatient} 
-          onClose={() => setDocumentPatient(null)} 
-          patientName={documentPatient || ''}
-          clinicName={profile?.clinic_name || 'Minha Clínica'}
-          city={profile?.city || 'Cidade'}
-        />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="text-center max-w-4xl mx-auto">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/50 px-4 py-2 rounded-full text-blue-700 text-sm font-semibold mb-8 shadow-sm hover:shadow-md transition-shadow">
+              <Zap className="w-4 h-4 fill-blue-600" />
+              <span>Novo: Integração com WhatsApp</span>
+              <ArrowRight className="w-4 h-4" />
+            </div>
+            
+            {/* Headline */}
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.1]">
+              Gerencie seu consultório com
+              <span className="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient">
+                inteligência e simplicidade
+              </span>
+            </h1>
+            
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
+              A plataforma completa para psicólogos, nutricionistas e terapeutas que querem <strong>focar no paciente</strong>, não na burocracia.
+            </p>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          
-          {/* COLUNA ESQUERDA */}
-          <div className="w-full lg:w-[360px] flex-shrink-0 space-y-6">
-            <CalendarWidget 
-              appointments={agendamentos} 
-              currentDate={currentMonthDate}
-              onDateChange={handleMonthChange}
-              selectedDate={selectedDate}
-              onSelectDate={(date) => { setSelectedDate(date); setSearchTerm(''); }} 
-            />
-            <RevenueChart appointments={agendamentos} currentDate={currentMonthDate} />
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+              <button 
+                onClick={() => router.push('/login')}
+                className="w-full sm:w-auto group px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full font-bold text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2"
+              >
+                Criar Conta Grátis
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button 
+                onClick={() => {
+                  const recursosSec = document.getElementById('recursos');
+                  recursosSec?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="w-full sm:w-auto px-8 py-4 bg-white text-gray-700 border-2 border-gray-200 rounded-full font-bold text-lg hover:border-blue-200 hover:bg-blue-50/50 transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+              >
+                <Smartphone className="w-5 h-5" />
+                Ver Demonstração
+              </button>
+            </div>
+
+            {/* Trust Badges */}
+            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                <span className="font-medium">7 dias grátis</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                <span className="font-medium">Sem cartão</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                <span className="font-medium">Cancele quando quiser</span>
+              </div>
+            </div>
           </div>
 
-          {/* COLUNA DIREITA */}
-          <div className="flex-1 min-w-0">
-            
-            {!searchTerm && (
-              <FinancialKPIs 
-                totalRevenue={financialTotals.totalRevenue} 
-                totalExpenses={financialTotals.totalExpenses} 
-              />
-            )}
+          {/* Dashboard Preview */}
+          <div className="mt-20 relative mx-auto max-w-6xl">
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-3xl blur-3xl opacity-20 animate-pulse"></div>
+            <div className="relative rounded-2xl bg-gray-900/5 p-2 ring-1 ring-inset ring-gray-900/10 backdrop-blur-sm lg:rounded-3xl lg:p-4">
+              <div className="rounded-xl bg-white shadow-2xl ring-1 ring-gray-900/10 overflow-hidden">
+                <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 p-8 min-h-[500px] flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-xl">
+                      <BarChart3 className="w-10 h-10 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900">Dashboard Intuitivo</h3>
+                    <p className="text-gray-600 max-w-md">Visualize todos os seus agendamentos, receitas e pacientes em uma interface limpa e moderna</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {searchTerm ? 'Resultados da busca' : format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
-                </h2>
-                <p className="text-gray-500 text-sm mt-1">
-                  {searchTerm ? `Filtrando por "${searchTerm}"` : 'Visão geral do dia.'}
+      {/* STATS SECTION */}
+      <section className="py-16 bg-gradient-to-br from-blue-600 to-indigo-700 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-20"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {[
+              { number: '2.5k+', label: 'Profissionais ativos' },
+              { number: '50k+', label: 'Consultas realizadas' },
+              { number: '98%', label: 'Satisfação' },
+              { number: '24/7', label: 'Suporte disponível' }
+            ].map((stat, i) => (
+              <div key={i} className="text-center">
+                <div className="text-3xl md:text-4xl font-bold text-white mb-2">{stat.number}</div>
+                <div className="text-blue-100 text-sm md:text-base">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES SECTION MODERNA */}
+      <section id="recursos" className="py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Tudo que você precisa para
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600"> crescer profissionalmente</span>
+            </h2>
+            <p className="text-lg text-gray-600">Ferramentas poderosas, design simples. É assim que trabalhamos.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              {
+                icon: <Calendar className="w-6 h-6" />,
+                title: 'Agenda Inteligente',
+                desc: 'Visualização diária, semanal e mensal. Confirme consultas por WhatsApp com um clique.',
+                color: 'from-blue-500 to-cyan-500'
+              },
+              {
+                icon: <FileText className="w-6 h-6" />,
+                title: 'Prontuário Digital',
+                desc: 'Histórico completo, anotações seguras e evolução do paciente em um só lugar.',
+                color: 'from-purple-500 to-pink-500'
+              },
+              {
+                icon: <DollarSign className="w-6 h-6" />,
+                title: 'Gestão Financeira',
+                desc: 'Controle de receitas, despesas e gráficos automáticos de faturamento.',
+                color: 'from-green-500 to-emerald-500'
+              },
+              {
+                icon: <ShieldCheck className="w-6 h-6" />,
+                title: 'Segurança Total',
+                desc: 'Dados criptografados e backups automáticos. Conforme LGPD.',
+                color: 'from-orange-500 to-red-500'
+              },
+              {
+                icon: <Users className="w-6 h-6" />,
+                title: 'Gestão de Pacientes',
+                desc: 'Cadastro completo, histórico de sessões e lembretes automáticos.',
+                color: 'from-indigo-500 to-purple-500'
+              },
+              {
+                icon: <TrendingUp className="w-6 h-6" />,
+                title: 'Relatórios & Insights',
+                desc: 'Dashboards visuais para acompanhar o crescimento do seu consultório.',
+                color: 'from-pink-500 to-rose-500'
+              }
+            ].map((feature, i) => (
+              <div 
+                key={i} 
+                className="group bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className={`w-14 h-14 bg-gradient-to-br ${feature.color} rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:shadow-xl transition-shadow text-white`}>
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section id="depoimentos" className="py-24 bg-gradient-to-br from-gray-50 to-blue-50/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Quem usa, recomenda</h2>
+            <p className="text-lg text-gray-600">Mais de 2.500 profissionais confiam no MedControl</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                quote: 'Transformou completamente minha rotina. Economizo pelo menos 2 horas por dia em tarefas administrativas.',
+                author: 'Dra. Juliana Martins',
+                role: 'Psicóloga Clínica',
+                avatar: 'JM',
+                rating: 5
+              },
+              {
+                quote: 'Interface linda e intuitiva. Meus pacientes elogiam a organização das consultas e lembretes.',
+                author: 'Dr. Carlos Eduardo',
+                role: 'Nutricionista',
+                avatar: 'CE',
+                rating: 5
+              },
+              {
+                quote: 'O suporte é excepcional. Qualquer dúvida é resolvida rapidamente. Recomendo muito!',
+                author: 'Fernanda Lima',
+                role: 'Fisioterapeuta',
+                avatar: 'FL',
+                rating: 5
+              }
+            ].map((testimonial, i) => (
+              <div key={i} className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all">
+                <div className="flex gap-1 mb-4">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-700 mb-6 leading-relaxed">"{testimonial.quote}"</p>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+                    {testimonial.avatar}
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">{testimonial.author}</p>
+                    <p className="text-sm text-gray-500">{testimonial.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="precos" className="py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Preço justo e transparente</h2>
+            <p className="text-lg text-gray-600">Sem surpresas, sem taxas escondidas. Cancele quando quiser.</p>
+          </div>
+
+          <div className="max-w-lg mx-auto">
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl shadow-2xl overflow-hidden relative transform hover:scale-105 transition-transform">
+              <div className="absolute top-0 right-0 bg-yellow-400 text-gray-900 text-xs font-bold px-4 py-2 rounded-bl-2xl shadow-lg">
+                🔥 MAIS POPULAR
+              </div>
+              
+              <div className="p-10 text-white">
+                <h3 className="text-lg font-semibold uppercase tracking-wide opacity-90 mb-2">Plano Profissional</h3>
+                <div className="flex items-baseline gap-2 mb-6">
+                  <span className="text-6xl font-extrabold">R$ 49</span>
+                  <span className="text-xl opacity-80">/mês</span>
+                </div>
+                <p className="text-blue-100 mb-8">Tudo ilimitado para gerenciar seu consultório com excelência.</p>
+                
+                <ul className="space-y-4 mb-10">
+                  {[
+                    'Pacientes Ilimitados',
+                    'Agenda Visual Completa',
+                    'Prontuário Eletrônico Seguro',
+                    'Gestão Financeira Completa',
+                    'Emissão de Documentos',
+                    'Integração WhatsApp',
+                    'Suporte Prioritário 24/7',
+                    'Atualizações Gratuitas'
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                      <span className="text-white/90">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button 
+                  onClick={() => router.push('/login')}
+                  className="w-full bg-white text-blue-700 font-bold py-4 rounded-xl shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1"
+                >
+                  Começar 7 Dias Grátis
+                </button>
+                <p className="text-center text-sm text-blue-200 mt-4">
+                  ✓ Não precisa cartão • ✓ Cancele quando quiser
                 </p>
               </div>
-              
-              <div className="flex w-full sm:w-auto gap-2 flex-wrap sm:flex-nowrap">
-                <div className="w-full sm:w-auto">
-                    <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Buscar paciente..." />
-                </div>
-                
-                <button 
-                  onClick={() => setIsTransactionModalOpen(true)}
-                  className="flex-1 sm:flex-none bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-xl font-semibold shadow-sm transition-all text-sm whitespace-nowrap"
-                >
-                  $ Lançar Conta
-                </button>
-
-                <button 
-                  onClick={() => { setEditingAppointment(null); setIsModalOpen(true); }}
-                  className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 text-sm whitespace-nowrap"
-                >
-                  <span>+ Agendar</span>
-                </button>
-              </div>
-            </div>
-
-            {/* LISTA (TIMELINE) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 min-h-[500px] p-6 relative">
-              
-              {loading ? (
-                <div className="flex justify-center items-center h-40"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
-              ) : displayedAppointments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-96 text-center">
-                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                     <CheckBadgeIcon className="w-8 h-8 text-gray-300" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900">Agenda Livre</h3>
-                  <p className="text-gray-500 text-sm max-w-xs mx-auto mt-2">
-                    {searchTerm ? "Nenhum resultado." : "Nenhum paciente para este dia."}
-                  </p>
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="absolute left-[59px] top-4 bottom-4 w-0.5 bg-gray-100 hidden sm:block"></div>
-                  <div className="space-y-6">
-                    {displayedAppointments.map((item) => {
-                       const statusColor = getStatusColor(item.status);
-                       const dotColor = getStatusDot(item.status);
-
-                       return (
-                        <div key={item.id} className="relative flex flex-col sm:flex-row group animate-in slide-in-from-bottom-2 duration-500">
-                          
-                          <div className="sm:w-16 flex-shrink-0 flex sm:flex-col items-center sm:items-end sm:pr-6 mb-2 sm:mb-0 gap-2 sm:gap-0">
-                            <span className="text-sm font-bold text-gray-900">
-                              {format(new Date(item.start_time), 'HH:mm')}
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              {format(new Date(item.end_time), 'HH:mm')}
-                            </span>
-                          </div>
-
-                          <div className={`absolute left-[55px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-white ring-1 ring-gray-200 hidden sm:block z-10 ${dotColor}`}></div>
-
-                          <div 
-                            onClick={() => { setEditingAppointment(item); setIsModalOpen(true); }}
-                            className="flex-1 bg-white border border-gray-100 rounded-xl p-4 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group-hover:translate-x-1"
-                          >
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h3 className="font-bold text-gray-800 text-lg flex flex-wrap items-center gap-2">
-                                  {item.patient_name}
-                                  
-                                  {/* --- BOTÃO WHATSAPP MELHORADO --- */}
-                                  {item.patient_phone && (
-                                    <button
-                                      onClick={(e) => openWhatsApp(e, item.patient_phone, item.patient_name, format(new Date(item.start_time), 'HH:mm'))}
-                                      className="flex items-center gap-1 text-green-700 bg-green-100 hover:bg-green-200 border border-green-200 px-3 py-1.5 rounded-lg transition-all"
-                                      title="Chamar no WhatsApp"
-                                    >
-                                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2z"/>
-                                      </svg>
-                                      <span className="text-xs font-bold">WhatsApp</span>
-                                    </button>
-                                  )}
-                                </h3>
-                                
-                                {item.notes && (
-                                  <p className="text-sm text-gray-500 mt-1 bg-gray-50 inline-block px-2 py-1 rounded-md border border-gray-100">
-                                    📝 {item.notes}
-                                  </p>
-                                )}
-                                
-                                <div className="mt-3 flex gap-2">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setHistoryPatientName(item.patient_name); }}
-                                    className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                                  >
-                                    Ver Prontuário &rarr;
-                                  </button>
-
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); setDocumentPatient(item.patient_name); }}
-                                    className="text-xs font-medium text-gray-500 hover:text-gray-800 hover:underline flex items-center gap-1"
-                                  >
-                                    <PrinterIcon className="w-3 h-3" />
-                                    Documentos
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col items-end gap-2">
-                                <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-full border ${statusColor}`}>
-                                  {item.status}
-                                </span>
-                                <span className="text-sm font-semibold text-gray-600">
-                                  {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                       );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </section>
+
+      {/* CTA FINAL */}
+      <section className="py-24 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-20"></div>
+        
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
+          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            Pronto para transformar seu consultório?
+          </h2>
+          <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
+            Junte-se a milhares de profissionais que já economizam horas toda semana.
+          </p>
+          <button 
+            onClick={() => router.push('/login')}
+            className="bg-white text-blue-700 px-10 py-5 rounded-full font-bold text-lg shadow-2xl hover:shadow-3xl transition-all transform hover:-translate-y-1 inline-flex items-center gap-3"
+          >
+            Começar Agora - É Grátis
+            <ArrowRight className="w-6 h-6" />
+          </button>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="bg-gray-900 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-12 mb-12">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
+                  M
+                </div>
+                <span className="text-xl font-bold">MedControl</span>
+              </div>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                A plataforma completa para gestão de consultórios de saúde.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold mb-4">Produto</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors">Recursos</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Preços</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Atualizações</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-bold mb-4">Empresa</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors">Sobre</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Contato</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-bold mb-4">Legal</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors">Termos de Uso</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Privacidade</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">LGPD</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-gray-400">
+              © 2025 MedControl. Feito com 💙 para a saúde.
+            </p>
+            <div className="flex gap-6">
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">Instagram</a>
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">LinkedIn</a>
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">YouTube</a>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      <style jsx>{`
+        @keyframes blob {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        @keyframes gradient {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        .animate-gradient {
+          background-size: 200% 200%;
+          animation: gradient 3s ease infinite;
+        }
+      `}</style>
+    </div>
   );
 }
