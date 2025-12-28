@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { 
-  CheckCircle, Zap, Shield, Users, 
+  CheckCircle, Zap, Shield, 
   ArrowRight, Star, Menu, X, 
   BarChart3, Calendar, Smartphone, FileText 
 } from 'lucide-react';
@@ -12,10 +12,16 @@ import {
 export default function LandingPage() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Controle de scroll
   const { scrollY } = useScroll();
-  const y1 = useTransform(scrollY, [0, 500], [0, 200]);
-  const y2 = useTransform(scrollY, [0, 500], [0, -150]);
+  
+  // PARALAXE RESTAURADO (Suavemente ajustado para não quebrar no mobile)
+  // [0, 500] -> [0, 150]: Move 150px para baixo quando rola 500px.
+  // É o suficiente para dar o efeito "uau" sem jogar o vídeo para fora da tela.
+  const y1 = useTransform(scrollY, [0, 500], [0, 150]);
 
+  // Estados para UI
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -59,7 +65,6 @@ export default function LandingPage() {
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-[120px] animate-blob"></div>
         <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] bg-purple-400/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
         <div className="absolute bottom-[-10%] left-[20%] w-[40%] h-[40%] bg-indigo-400/20 rounded-full blur-[120px] animate-blob animation-delay-4000"></div>
-        {/* Grid Pattern sutil */}
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
       </div>
 
@@ -115,7 +120,9 @@ export default function LandingPage() {
       )}
 
       {/* --- HERO SECTION --- */}
-      <section className="relative pt-40 pb-20 lg:pt-52 lg:pb-32 px-6 overflow-hidden">
+      {/* CORREÇÃO AQUI: Aumentei MUITO o padding-bottom (pb-48 no mobile) */}
+      {/* Isso cria o espaço vazio necessário para o vídeo descer (paralaxe) sem ser cortado */}
+      <section className="relative pt-32 pb-48 md:pb-32 lg:pt-52 lg:pb-32 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto text-center relative z-10">
           
           <motion.div
@@ -133,7 +140,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 leading-[1.1]"
+            className="text-4xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 leading-[1.1]"
           >
             Seu consultório no<br/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x">
@@ -145,7 +152,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed"
+            className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed"
           >
             Organize agenda, prontuários e financeiro em um sistema feito para profissionais de saúde que valorizam seu tempo livre.
           </motion.p>
@@ -169,7 +176,7 @@ export default function LandingPage() {
             </button>
           </motion.div>
 
-{/* DASHBOARD MOCKUP FLUTUANTE (COM VÍDEO REAL) */}
+          {/* DASHBOARD MOCKUP FLUTUANTE (COM VÍDEO REAL E PARALAXE) */}
           <motion.div 
             style={{ y: y1 }}
             className="mt-20 relative mx-auto max-w-6xl z-10"
@@ -199,11 +206,12 @@ export default function LandingPage() {
       </section>
 
       {/* --- BENTO GRID FEATURES --- */}
-      <section id="features" className="py-32 bg-white relative">
+      {/* Ajustei o padding-top (pt-24) para garantir que o vídeo não encoste aqui */}
+      <section id="features" className="py-24 md:py-32 bg-white relative">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-20">
             <h2 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-3">Funcionalidades</h2>
-            <h3 className="text-4xl font-bold text-slate-900 mb-6">Tudo o que você precisa,<br/>nada do que atrapalha.</h3>
+            <h3 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">Tudo o que você precisa,<br/>nada do que atrapalha.</h3>
             <p className="text-lg text-slate-500">Desenvolvemos cada detalhe pensando em economizar seus cliques. Menos burocracia, mais atendimento.</p>
           </div>
 
