@@ -169,32 +169,32 @@ export default function LandingPage() {
             </button>
           </motion.div>
 
-          {/* DASHBOARD MOCKUP FLUTUANTE */}
+{/* DASHBOARD MOCKUP FLUTUANTE (COM VÍDEO REAL) */}
           <motion.div 
             style={{ y: y1 }}
             className="mt-20 relative mx-auto max-w-6xl z-10"
           >
-            {/* Efeito de brilho atrás do print */}
+            {/* Efeito de brilho atrás do vídeo */}
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl blur opacity-20"></div>
             
             <div className="relative rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-slate-900/10">
-              <div className="rounded-xl overflow-hidden bg-slate-50 aspect-[16/9] relative group">
-                {/* Substituir pelo Print Real */}
-                <img 
-                  src="https://cdn.dribbble.com/userupload/12476536/file/original-06248c89c894982635951664c39f16d8.png?resize=1600x1200" // Exemplo genérico
-                  alt="Dashboard Preview" 
+              {/* Container do Vídeo */}
+              <div className="rounded-xl overflow-hidden bg-black aspect-[16/9] relative group">
+                <video 
+                  src="/demo.mp4" 
                   className="w-full h-full object-cover"
-                />
-                
-                {/* Botão de Play Fake */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-all cursor-pointer">
-                  <div className="w-20 h-20 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform">
-                    <div className="w-0 h-0 border-t-[10px] border-t-transparent border-l-[18px] border-l-blue-600 border-b-[10px] border-b-transparent ml-1"></div>
-                  </div>
-                </div>
+                  controls 
+                  autoPlay 
+                  muted 
+                  loop 
+                  playsInline
+                >
+                  Seu navegador não suporta a tag de vídeo.
+                </video>
               </div>
             </div>
           </motion.div>
+
         </div>
       </section>
 
@@ -253,25 +253,6 @@ export default function LandingPage() {
                 />
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* --- STATS / SOCIAL PROOF --- */}
-      <section className="py-20 border-y border-slate-100 bg-slate-50/50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { label: "Profissionais Ativos", value: "+2.000" },
-              { label: "Consultas Agendadas", value: "+150k" },
-              { label: "Tempo Economizado", value: "30h/mês" },
-              { label: "Satisfação", value: "4.9/5.0" },
-            ].map((stat, i) => (
-              <div key={i}>
-                <div className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-2">{stat.value}</div>
-                <div className="text-slate-500 font-medium">{stat.label}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
