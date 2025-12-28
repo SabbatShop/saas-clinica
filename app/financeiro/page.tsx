@@ -4,10 +4,11 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getTransactions, deleteTransaction, Transaction } from '../services/transactionService';
+import { getMonthlyAppointments } from '../services/appointmentService'; // <--- IMPORTADO
 import { NewTransactionModal } from '../componentes/NewTransactionModal';
 import { format, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import toast from 'react-hot-toast'; // <--- IMPORTADO
+import toast from 'react-hot-toast';
 import { 
   ArrowLeftIcon, 
   ChevronLeftIcon, 
@@ -16,13 +17,17 @@ import {
   PencilIcon, 
   ArrowTrendingUpIcon, 
   ArrowTrendingDownIcon,
-  BanknotesIcon
+  BanknotesIcon,
+  CalendarDaysIcon // <--- Ícone para identificar consultas
 } from '@heroicons/react/24/outline';
+
+// Estendemos o tipo Transaction para saber se é uma consulta vinda da agenda
+type FinancialItem = Transaction & { isAppointment?: boolean };
 
 export default function FinanceiroPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [financialItems, setFinancialItems] = useState<FinancialItem[]>([]); // <--- MUDADO NOME
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userId, setUserId] = useState('');
   
@@ -37,42 +42,82 @@ export default function FinanceiroPage() {
         return;
       }
       setUserId(session.user.id);
-      fetchTransactions(currentDate, session.user.id);
+      fetchData(currentDate, session.user.id);
     }
     init();
   }, []);
 
   useEffect(() => {
-    if (userId) fetchTransactions(currentDate, userId);
-  }, [currentDate]);
+    if (userId) fetchData(currentDate, userId);
+  }, [currentDate, userId]); // Adicionado userId na dependência
 
-  async function fetchTransactions(date: Date, uid: string) {
+  async function fetchData(date: Date, uid: string) {
     setLoading(true);
     try {
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
-      const data = await getTransactions(month, year, uid);
-      setTransactions(data || []);
+
+      // Buscamos Transações E Agendamentos simultaneamente
+      const [transactionsData, appointmentsData] = await Promise.all([
+        getTransactions(month, year, uid),
+        getMonthlyAppointments(year, month, uid)
+      ]);
+
+      // 1. Prepara as transações manuais
+      const manualTransactions: FinancialItem[] = (transactionsData || []).map(t => ({
+        ...t,
+        isAppointment: false
+      }));
+
+      // 2. Prepara os agendamentos CONCLUÍDOS como se fossem entradas
+      const appointmentTransactions: FinancialItem[] = (appointmentsData || [])
+        .filter(app => app.status === 'concluido')
+        .map(app => ({
+          id: `app-${app.id}`, // ID fictício para a lista
+          doctor_id: app.doctor_id,
+          description: `Consulta: ${app.patient_name}`,
+          amount: app.price,
+          type: 'income',
+          category: 'Consulta',
+          date: app.start_time,
+          isAppointment: true
+        }));
+
+      // 3. Junta tudo e ordena por data (mais recente primeiro)
+      const combined = [...manualTransactions, ...appointmentTransactions].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      setFinancialItems(combined);
     } catch (error) {
       console.error(error);
+      toast.error("Erro ao carregar dados financeiros.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(item: FinancialItem) {
+    if (item.isAppointment) {
+      toast.error('Gerencie esta consulta pela Agenda no Dashboard.');
+      return;
+    }
     if (!confirm('Tem certeza que deseja excluir este lançamento?')) return;
     try {
-      await deleteTransaction(id);
-      toast.success('Lançamento excluído.'); // <--- TOAST
-      fetchTransactions(currentDate, userId); 
+      await deleteTransaction(item.id);
+      toast.success('Lançamento excluído.');
+      fetchData(currentDate, userId); 
     } catch (error) {
-      toast.error('Erro ao excluir.'); // <--- TOAST
+      toast.error('Erro ao excluir.');
     }
   }
 
-  function handleEdit(transaction: Transaction) {
-    setEditingTransaction(transaction);
+  function handleEdit(item: FinancialItem) {
+    if (item.isAppointment) {
+      toast('Edite o valor desta consulta pela Agenda.', { icon: '📅' });
+      return;
+    }
+    setEditingTransaction(item);
     setIsModalOpen(true);
   }
 
@@ -81,11 +126,12 @@ export default function FinanceiroPage() {
     setEditingTransaction(null);
   }
 
+  // Cálculos unificados
   const totals = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
-    const expense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+    const income = financialItems.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
+    const expense = financialItems.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
     return { income, expense, balance: income - expense };
-  }, [transactions]);
+  }, [financialItems]);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
@@ -93,7 +139,7 @@ export default function FinanceiroPage() {
       <NewTransactionModal 
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onSuccess={() => fetchTransactions(currentDate, userId)}
+        onSuccess={() => fetchData(currentDate, userId)}
         currentUserId={userId}
         transactionToEdit={editingTransaction}
       />
@@ -131,7 +177,7 @@ export default function FinanceiroPage() {
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
              <div className="flex items-center gap-2 mb-2 text-green-600">
                <ArrowTrendingUpIcon className="w-5 h-5" />
-               <span className="text-xs font-bold uppercase tracking-wider">Entradas Mensais</span>
+               <span className="text-xs font-bold uppercase tracking-wider">Entradas (Total)</span>
              </div>
              <p className="text-2xl font-bold text-gray-900">{totals.income.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
           </div>
@@ -159,7 +205,7 @@ export default function FinanceiroPage() {
           
           {loading ? (
              <div className="p-10 text-center text-gray-400">Carregando...</div>
-          ) : transactions.length === 0 ? (
+          ) : financialItems.length === 0 ? (
              <div className="p-10 text-center text-gray-400 flex flex-col items-center">
                 <BanknotesIcon className="w-10 h-10 mb-2 text-gray-200" />
                 <p>Nenhuma movimentação neste mês.</p>
@@ -177,16 +223,21 @@ export default function FinanceiroPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {transactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-gray-50 transition-colors group">
+                  {financialItems.map((t) => (
+                    <tr key={t.id} className={`hover:bg-gray-50 transition-colors group ${t.isAppointment ? 'bg-blue-50/30' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {format(new Date(t.date), 'dd/MM/yyyy')}
                       </td>
-                      <td className="px-6 py-4 font-medium text-gray-900">
+                      <td className="px-6 py-4 font-medium text-gray-900 flex items-center gap-2">
+                        {t.isAppointment && <CalendarDaysIcon className="w-4 h-4 text-blue-400" title="Origem: Agenda" />}
                         {t.description}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                        <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                            t.isAppointment 
+                            ? 'bg-blue-50 text-blue-700 ring-blue-600/20' 
+                            : 'bg-gray-100 text-gray-600 ring-gray-500/10'
+                        }`}>
                           {t.category || 'Geral'}
                         </span>
                       </td>
@@ -197,15 +248,15 @@ export default function FinanceiroPage() {
                       <td className="px-6 py-4 text-center flex justify-center gap-3">
                         <button 
                           onClick={() => handleEdit(t)}
-                          className="text-gray-900 hover:text-blue-600 transition-colors p-1"
-                          title="Editar"
+                          className={`${t.isAppointment ? 'text-gray-300 cursor-not-allowed' : 'text-gray-900 hover:text-blue-600'} transition-colors p-1`}
+                          title={t.isAppointment ? "Gerencie esta consulta na Agenda" : "Editar"}
                         >
                           <PencilIcon className="w-5 h-5" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(t.id)}
-                          className="text-gray-900 hover:text-red-600 transition-colors p-1"
-                          title="Excluir"
+                          onClick={() => handleDelete(t)}
+                          className={`${t.isAppointment ? 'text-gray-300 cursor-not-allowed' : 'text-gray-900 hover:text-red-600'} transition-colors p-1`}
+                          title={t.isAppointment ? "Gerencie esta consulta na Agenda" : "Excluir"}
                         >
                           <TrashIcon className="w-5 h-5" />
                         </button>
