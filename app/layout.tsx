@@ -6,7 +6,7 @@ import { Toaster } from 'react-hot-toast';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'DocFlow',
+  title: 'FastClinic',
   description: 'Gestão Inteligente para Profissionais de Saúde',
   icons: {
     icon: '/favicon.ico',

@@ -74,8 +74,8 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">D</div>
-            <span className="text-xl font-bold tracking-tight text-slate-900">DocFlow</span>
+            <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">F</div>
+            <span className="text-xl font-bold tracking-tight text-slate-900">FastClinic</span>
           </div>
 
           {/* Desktop Menu */}
@@ -323,8 +323,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">D</div>
-              <span className="text-xl font-bold text-white">DocFlow</span>
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">F</div>
+              <span className="text-xl font-bold text-white">FastClinic</span>
             </div>
             <div className="flex gap-8 text-sm font-medium">
               <a href="#" className="hover:text-white transition-colors">Termos de Uso</a>
@@ -332,7 +332,8 @@ export default function LandingPage() {
               <a href="#" className="hover:text-white transition-colors">Suporte</a>
             </div>
             <div className="text-sm text-slate-500">
-              © 2025 DocFlow Inc.
+              
+              © 2025 FastClinic Inc.
             </div>
           </div>
         </div>
