@@ -131,7 +131,7 @@ export default function FinanceiroPage() {
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
              <div className="flex items-center gap-2 mb-2 text-green-600">
                <ArrowTrendingUpIcon className="w-5 h-5" />
-               <span className="text-xs font-bold uppercase tracking-wider">Entradas Extras</span>
+               <span className="text-xs font-bold uppercase tracking-wider">Entradas Mensais</span>
              </div>
              <p className="text-2xl font-bold text-gray-900">{totals.income.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
           </div>

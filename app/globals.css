@@ -1,26 +1,60 @@
 @import "tailwindcss";
 
+/* --- TEMA E ANIMAÇÕES (Sintaxe Tailwind v4) --- */
+:root {
+  /* Define as animações personalizadas aqui dentro */
+  --animate-blob: blob 7s infinite;
+  --animate-gradient-x: gradient-x 15s ease infinite;
+}
+
+@keyframes blob {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes gradient-x {
+  0%, 100% {
+      background-size: 200% 200%;
+      background-position: left center;
+  }
+  50% {
+      background-size: 200% 200%;
+      background-position: right center;
+  }
+}
+
+/* --- VARIÁVEIS DE CORES --- */
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Mantém o suporte a dark mode do seu projeto original, se quiser usar */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Se quiser a landing page sempre branca, mude --background aqui para #ffffff também */
+    --background: #ffffff; 
+    --foreground: #171717;
   }
 }
 
+/* --- ESTILOS GERAIS --- */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden; /* Evita rolagem lateral */
+}
+
+/* --- UTILITÁRIOS EXTRAS --- */
+/* O Tailwind v4 não gera classes de delay arbitrário automaticamente sem configuração, então adicionamos manual */
+@layer utilities {
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
 }
