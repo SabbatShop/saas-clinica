@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, useScroll, useTransform } from 'framer-motion';
+// --- IMPORTS NOVOS DO STRIPE ---
+import { supabase } from '@/lib/supabase';
+import toast from 'react-hot-toast';
+// ------------------------------
 import { 
   CheckCircle, Zap, Shield, 
   ArrowRight, Star, Menu, X, 
@@ -13,6 +17,9 @@ export default function LandingPage() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
+  // --- ESTADO PARA O LOADING DO PAGAMENTO ---
+  const [loadingCheckout, setLoadingCheckout] = useState(false);
+
   // Controle de scroll
   const { scrollY } = useScroll();
   
@@ -29,6 +36,47 @@ export default function LandingPage() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // --- FUNÇÃO QUE CRIA O PAGAMENTO ---
+  async function handleSubscribe() {
+    setLoadingCheckout(true);
+    try {
+      // 1. Verifica se está logado
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("Crie uma conta ou faça login para assinar.");
+        router.push('/login');
+        return;
+      }
+
+      // 2. Chama a API de Checkout
+      // IMPORTANTE: Certifique-se que o arquivo da API se chama 'route.ts' e não 'rout.ts'
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: session.user.id,
+          email: session.user.email
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        // 3. Redireciona para o Stripe
+        window.location.href = data.url; 
+      } else {
+        console.error('Erro Stripe:', data.error);
+        toast.error("Erro ao iniciar pagamento.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro de conexão.");
+    } finally {
+      setLoadingCheckout(false);
+    }
+  }
 
   const features = [
     {
@@ -306,12 +354,15 @@ export default function LandingPage() {
                 ))}
               </div>
 
+              {/* --- BOTÃO DE ASSINATURA --- */}
               <button 
-                onClick={() => router.push('/login')} 
-                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-lg shadow-lg transition-all hover:-translate-y-1"
+                onClick={handleSubscribe} 
+                disabled={loadingCheckout}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-lg shadow-lg transition-all hover:-translate-y-1 disabled:opacity-70 disabled:cursor-wait"
               >
-                Testar Grátis por 7 dias
+                {loadingCheckout ? 'Carregando Pagamento...' : 'Assinar Agora'}
               </button>
+              
               <p className="text-center text-xs text-slate-400 mt-4">Não pedimos cartão de crédito no teste.</p>
             </div>
           </div>
