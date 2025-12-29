@@ -72,3 +72,7 @@ export async function POST(req: Request) {
 
   return new NextResponse(null, { status: 200 });
 }
+// Adicione isso no final do arquivo para testarmos no navegador
+export async function GET() {
+  return NextResponse.json({ message: "Webhook funcionando! O método GET foi aceito." });
+}
