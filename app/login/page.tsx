@@ -37,7 +37,7 @@ export default function LoginPage() {
 
       if (error) throw error;
 
-      toast.success('Conta criada com sucesso!.');
+      toast.success('Link enviado! Verifique seu e-mail (e a caixa de Spam).');
       setIsRecovery(false); 
     } catch (error: any) {
       toast.error('Erro: ' + error.message);
@@ -97,7 +97,7 @@ export default function LoginPage() {
 
           if (profileError) console.error(profileError);
 
-          toast.success('Conta criada! Verifique seu e-mail.'); 
+          toast.success('Conta criada!'); 
         }
 
       } else {
