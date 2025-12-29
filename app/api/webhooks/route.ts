@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicializa o Supabase com a chave de serviço (ADMIN)
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY! 
@@ -29,38 +28,38 @@ export async function POST(req: Request) {
   const session = event.data.object as any;
 
   try {
-    // 1. CHECKOUT COMPLETADO (Criação da Assinatura com ou sem Trial)
+    // 1. CHECKOUT COMPLETADO
     if (event.type === 'checkout.session.completed') {
-      // Usamos : any para evitar o erro de propriedade inexistente no tipo Response
-      const subscription: any = await stripe.subscriptions.retrieve(session.subscription as string);
+      const subscriptionId = session.subscription as string;
+      if (!subscriptionId) throw new Error("Subscription ID missing in checkout.session.completed");
+
+      const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
       const userId = session.metadata.userId;
 
-      console.log(`🔔 Checkout recebido para UserID: ${userId} | Status: ${subscription.status}`);
-
-      if (!userId) {
-         return new NextResponse('UserID Missing', { status: 400 });
-      }
+      if (!userId) return new NextResponse('UserID Missing', { status: 400 });
 
       const { error } = await supabaseAdmin
         .from('profiles')
         .update({
-          subscription_status: subscription.status, // Salva 'trialing' ou 'active'
+          subscription_status: subscription.status,
           plan_type: 'pro',
           stripe_customer_id: session.customer,
-          stripe_subscription_id: session.subscription,
+          stripe_subscription_id: subscriptionId,
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         })
         .eq('id', userId);
 
-        if (error) {
-            console.error('❌ Erro ao salvar no Supabase:', error);
-            return new NextResponse(`Database Error: ${error.message}`, { status: 500 });
-        }
+        if (error) throw error;
     }
 
-    // 2. MUDANÇA DE STATUS (Ex: De 'trialing' para 'active' quando o trial acaba)
-    if (event.type === 'customer.subscription.updated') {
-        const subscription: any = await stripe.subscriptions.retrieve(session.id as string);
+    // 2. ATUALIZAÇÃO OU RENOVAÇÃO
+    if (event.type === 'customer.subscription.updated' || event.type === 'invoice.payment_succeeded') {
+      // No invoice.payment_succeeded o ID vem em session.subscription
+      // No customer.subscription.updated o ID vem em session.id
+      const subscriptionId = (event.type === 'invoice.payment_succeeded' ? session.subscription : session.id) as string;
+
+      if (subscriptionId) {
+        const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
         
         await supabaseAdmin
           .from('profiles')
@@ -68,42 +67,32 @@ export async function POST(req: Request) {
             subscription_status: subscription.status,
             current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           })
-          .eq('stripe_subscription_id', session.id);
+          .eq('stripe_subscription_id', subscriptionId);
+      }
     }
 
-    // 3. RENOVAÇÃO (Pagamento da Fatura)
-    if (event.type === 'invoice.payment_succeeded') {
-      const subscription: any = await stripe.subscriptions.retrieve(session.subscription as string);
-      
-      await supabaseAdmin
-        .from('profiles')
-        .update({
-          subscription_status: subscription.status,
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        })
-        .eq('stripe_subscription_id', session.subscription);
-    }
-
-    // 4. CANCELAMENTO
+    // 3. CANCELAMENTO
     if (event.type === 'customer.subscription.deleted') {
+      // No cancelamento, o ID da assinatura é o próprio ID do objeto retornado
+      const subscriptionId = session.id as string;
+
       await supabaseAdmin
         .from('profiles')
         .update({ 
             subscription_status: 'canceled',
             plan_type: 'basic'
         })
-        .eq('stripe_subscription_id', session.subscription);
+        .eq('stripe_subscription_id', subscriptionId);
     }
 
     return new NextResponse(null, { status: 200 });
 
   } catch (err: any) {
-    console.error('❌ Erro Geral no Webhook:', err);
+    console.error('❌ Erro Geral no Webhook:', err.message);
     return new NextResponse(`Server Error: ${err.message}`, { status: 500 });
   }
 }
 
-// Rota de teste para navegador
 export async function GET() {
   return NextResponse.json({ message: "Webhook Online!" });
 }
