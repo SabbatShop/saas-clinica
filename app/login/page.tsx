@@ -8,7 +8,7 @@ import {
   EyeIcon, 
   EyeSlashIcon,
   ArrowLeftIcon,
-  MapPinIcon // <--- Ícone novo para cidade
+  MapPinIcon
 } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
@@ -20,10 +20,10 @@ export default function LoginPage() {
   // Dados do Formulário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState(''); // <--- NOVO
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [clinicName, setClinicName] = useState('');
-  const [city, setCity] = useState(''); // <--- NOVO
-  const [showPassword, setShowPassword] = useState(false); // <--- NOVO
+  const [city, setCity] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   // --- FUNÇÃO DE RECUPERAÇÃO DE SENHA ---
   async function handleRecovery(e: React.FormEvent) {
@@ -51,7 +51,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    // --- VALIDAÇÕES NOVAS ---
+    // --- VALIDAÇÕES ---
     if (isSignUp) {
         if (password !== confirmPassword) {
             toast.error("As senhas não coincidem.");
@@ -86,13 +86,13 @@ export default function LoginPage() {
         }
 
         if (authData.user) {
-          // Agora salvamos também a CIDADE
+          // Salva perfil e cidade
           const { error: profileError } = await supabase
             .from('profiles')
             .upsert({
               id: authData.user.id,
               clinic_name: clinicName,
-              city: city, // <--- SALVANDO CIDADE
+              city: city,
             }, { onConflict: 'id' });
 
           if (profileError) console.error(profileError);
@@ -109,8 +109,10 @@ export default function LoginPage() {
         if (error) throw error;
         
         toast.success('Bem-vindo de volta!');
-        router.push('/'); 
+        
+        // CORREÇÃO UX: Força atualização e ida para Dashboard
         router.refresh(); 
+        router.push('/dashboard'); 
       }
     } catch (error: any) {
       let msg = error.message;
@@ -226,7 +228,7 @@ export default function LoginPage() {
                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                    <label className="block text-sm font-semibold text-gray-700 mb-1">Confirmar Senha</label>
                    <input 
-                    type="password" // Mantive password aqui pra não poluir, mas validação existe
+                    type="password" 
                     required={isSignUp} 
                     value={confirmPassword} 
                     onChange={e => setConfirmPassword(e.target.value)} 
@@ -261,7 +263,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* LADO DIREITO (Imagem/Marketing) - MANTIDO IGUAL */}
+      {/* LADO DIREITO (Imagem/Marketing) */}
       <div className="hidden lg:block relative w-0 flex-1 bg-gray-900">
         <img className="absolute inset-0 h-full w-full object-cover opacity-60 mix-blend-overlay" src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80" alt="Medical Background" />
         <div className="absolute inset-0 bg-gradient-to-t from-blue-900 via-blue-900/40 to-transparent"></div>

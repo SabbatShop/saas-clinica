@@ -3,36 +3,38 @@ import { stripe } from '@/lib/stripe';
 
 export async function POST(request: Request) {
   try {
-    // 1. Recebe os dados do usuário que quer pagar
     const { userId, email } = await request.json();
 
     if (!userId || !email) {
-      return NextResponse.json({ error: 'Dados do usuário faltando' }, { status: 400 });
+      return NextResponse.json({ error: 'Dados faltando' }, { status: 400 });
     }
 
-    // 2. Cria a Sessão de Checkout no Stripe
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'], // Aceitar cartão
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID, // O ID que você pegou no painel (price_...)
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription', // Modo Assinatura (Recorrente)
+      payment_method_types: ['card'],
+      line_items: [{
+        price: process.env.STRIPE_PRICE_ID,
+        quantity: 1,
+      }],
+      mode: 'subscription',
+      
+      // CONFIGURAÇÃO DO TRIAL (7 DIAS)
+      subscription_data: {
+        trial_period_days: 7, 
+      },
+      
+      // Removido 'payment_settings' para corrigir o erro de TypeScript.
+      // No modo 'subscription', o Stripe já gerencia o salvamento do cartão automaticamente.
+
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/?canceled=true`,
-      customer_email: email, // Já preenche o email do médico
-      metadata: {
-        userId: userId, // CRÍTICO: Isso permite a gente saber QUEM pagou depois
-      },
+      customer_email: email,
+      metadata: { userId },
     });
 
-    // 3. Devolve o link de pagamento para o site
     return NextResponse.json({ url: session.url });
 
   } catch (error: any) {
-    console.error('Erro no Stripe:', error);
+    console.error('Erro Checkout:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

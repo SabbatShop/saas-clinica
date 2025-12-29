@@ -3,10 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, useScroll, useTransform } from 'framer-motion';
-// --- IMPORTS NOVOS DO STRIPE ---
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-// ------------------------------
 import { 
   CheckCircle, Zap, Shield, 
   ArrowRight, Star, Menu, X, 
@@ -16,32 +14,31 @@ import {
 export default function LandingPage() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
-  // --- ESTADO PARA O LOADING DO PAGAMENTO ---
   const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [user, setUser] = useState<any>(null); // Estado para o usuário
 
   // Controle de scroll
   const { scrollY } = useScroll();
-  
-  // PARALAXE RESTAURADO (Suavemente ajustado para não quebrar no mobile)
-  // [0, 500] -> [0, 150]: Move 150px para baixo quando rola 500px.
-  // É o suficiente para dar o efeito "uau" sem jogar o vídeo para fora da tela.
   const y1 = useTransform(scrollY, [0, 500], [0, 150]);
-
-  // Estados para UI
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
+    
+    // Verifica sessão do usuário
+    async function checkUser() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) setUser(session.user);
+    }
+    checkUser();
+
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // --- FUNÇÃO QUE CRIA O PAGAMENTO ---
   async function handleSubscribe() {
     setLoadingCheckout(true);
     try {
-      // 1. Verifica se está logado
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -50,8 +47,6 @@ export default function LandingPage() {
         return;
       }
 
-      // 2. Chama a API de Checkout
-      // IMPORTANTE: Certifique-se que o arquivo da API se chama 'route.ts' e não 'rout.ts'
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,7 +59,6 @@ export default function LandingPage() {
       const data = await response.json();
 
       if (data.url) {
-        // 3. Redireciona para o Stripe
         window.location.href = data.url; 
       } else {
         console.error('Erro Stripe:', data.error);
@@ -108,7 +102,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100 overflow-x-hidden">
       
-      {/* --- BACKGROUND ANIMADO (AURORA) --- */}
+      {/* BACKGROUND ANIMADO */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-[120px] animate-blob"></div>
         <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] bg-purple-400/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
@@ -116,7 +110,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
       </div>
 
-      {/* --- NAVBAR --- */}
+      {/* NAVBAR */}
       <nav className={`fixed w-full z-50 transition-all duration-300 ${
         scrolled ? 'bg-white/80 backdrop-blur-md border-b border-slate-200 py-3' : 'bg-transparent py-5'
       }`}>
@@ -130,19 +124,33 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">Funcionalidades</a>
             <a href="#pricing" className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">Preços</a>
-            <button 
-              onClick={() => router.push('/login')} 
-              className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
-            >
-              Entrar
-            </button>
-            <button 
-              onClick={() => router.push('/login')} 
-              className="group relative bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-xl hover:shadow-2xl hover:-translate-y-0.5"
-            >
-              Começar Grátis
-              <span className="absolute inset-0 rounded-full ring-2 ring-white/20 group-hover:ring-white/40 transition-all"></span>
-            </button>
+            
+            {/* LÓGICA DE USUÁRIO LOGADO/DESLOGADO */}
+            {user ? (
+                <button 
+                  onClick={() => router.push('/dashboard')} 
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all flex items-center gap-2"
+                >
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  Ir para Dashboard
+                </button>
+            ) : (
+                <>
+                    <button 
+                      onClick={() => router.push('/login')} 
+                      className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
+                    >
+                      Entrar
+                    </button>
+                    <button 
+                      onClick={() => router.push('/login')} 
+                      className="group relative bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-xl hover:shadow-2xl hover:-translate-y-0.5"
+                    >
+                      Começar Grátis
+                      <span className="absolute inset-0 rounded-full ring-2 ring-white/20 group-hover:ring-white/40 transition-all"></span>
+                    </button>
+                </>
+            )}
           </div>
 
           {/* Mobile Button */}
@@ -162,14 +170,14 @@ export default function LandingPage() {
           <div className="flex flex-col gap-6 text-xl font-medium">
             <a href="#features" onClick={() => setMobileMenuOpen(false)}>Funcionalidades</a>
             <a href="#pricing" onClick={() => setMobileMenuOpen(false)}>Preços</a>
-            <a href="/login" className="text-blue-600">Entrar no Sistema</a>
+            <a href="/login" className="text-blue-600">
+                {user ? 'Ir para Dashboard' : 'Entrar no Sistema'}
+            </a>
           </div>
         </motion.div>
       )}
 
-      {/* --- HERO SECTION --- */}
-      {/* CORREÇÃO AQUI: Aumentei MUITO o padding-bottom (pb-48 no mobile) */}
-      {/* Isso cria o espaço vazio necessário para o vídeo descer (paralaxe) sem ser cortado */}
+      {/* HERO SECTION */}
       <section className="relative pt-32 pb-48 md:pb-32 lg:pt-52 lg:pb-32 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto text-center relative z-10">
           
@@ -211,39 +219,36 @@ export default function LandingPage() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <button 
-              onClick={() => router.push('/login')} 
-              className="w-full sm:w-auto h-14 px-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-lg shadow-xl shadow-blue-500/30 transition-all hover:scale-105 flex items-center justify-center gap-2"
-            >
-              <Zap className="w-5 h-5 fill-current" />
-              Criar Conta Grátis
-            </button>
+            {user ? (
+                <button 
+                  onClick={() => router.push('/dashboard')} 
+                  className="w-full sm:w-auto h-14 px-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-bold text-lg shadow-xl shadow-emerald-500/30 transition-all hover:scale-105 flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-5 h-5 fill-current" />
+                  Acessar meu Painel
+                </button>
+            ) : (
+                <button 
+                  onClick={() => router.push('/login')} 
+                  className="w-full sm:w-auto h-14 px-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-lg shadow-xl shadow-blue-500/30 transition-all hover:scale-105 flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-5 h-5 fill-current" />
+                  Criar Conta Grátis
+                </button>
+            )}
+
             <button className="w-full sm:w-auto h-14 px-8 bg-white text-slate-700 border border-slate-200 rounded-full font-bold text-lg hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 shadow-sm">
               <Smartphone className="w-5 h-5" />
               Ver demonstração
             </button>
           </motion.div>
 
-          {/* DASHBOARD MOCKUP FLUTUANTE (COM VÍDEO REAL E PARALAXE) */}
-          <motion.div 
-            style={{ y: y1 }}
-            className="mt-20 relative mx-auto max-w-6xl z-10"
-          >
-            {/* Efeito de brilho atrás do vídeo */}
+          {/* MOCKUP FLUTUANTE */}
+          <motion.div style={{ y: y1 }} className="mt-20 relative mx-auto max-w-6xl z-10">
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl blur opacity-20"></div>
-            
             <div className="relative rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-slate-900/10">
-              {/* Container do Vídeo */}
               <div className="rounded-xl overflow-hidden bg-black aspect-[16/9] relative group">
-                <video 
-                  src="/demo.mp4" 
-                  className="w-full h-full object-cover"
-                  controls 
-                  autoPlay 
-                  muted 
-                  loop 
-                  playsInline
-                >
+                <video src="/demo.mp4" className="w-full h-full object-cover" controls autoPlay muted loop playsInline>
                   Seu navegador não suporta a tag de vídeo.
                 </video>
               </div>
@@ -253,8 +258,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* --- BENTO GRID FEATURES --- */}
-      {/* Ajustei o padding-top (pt-24) para garantir que o vídeo não encoste aqui */}
+      {/* BENTO GRID */}
       <section id="features" className="py-24 md:py-32 bg-white relative">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-20">
@@ -283,10 +287,8 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* Feature Destaque (Lado a Lado) */}
           <div className="mt-20 bg-slate-900 rounded-[3rem] p-8 md:p-20 text-white overflow-hidden relative">
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/30 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2"></div>
-            
             <div className="grid md:grid-cols-2 gap-16 items-center relative z-10">
               <div>
                 <div className="inline-flex items-center gap-2 bg-blue-500/20 border border-blue-500/30 px-3 py-1 rounded-full text-blue-300 text-xs font-bold mb-6">
@@ -313,7 +315,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* --- PRICING --- */}
+      {/* PRICING */}
       <section id="pricing" className="py-32 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="text-center mb-16">
@@ -333,6 +335,11 @@ export default function LandingPage() {
                 <div className="text-right">
                   <div className="text-5xl font-extrabold text-slate-900">R$85</div>
                   <div className="text-slate-400 font-medium">/mês</div>
+                  
+                  {/* --- BADGE 7 DIAS GRÁTIS --- */}
+                  <div className="mt-2 inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-md">
+                    7 DIAS GRÁTIS
+                  </div>
                 </div>
               </div>
 
@@ -354,22 +361,22 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              {/* --- BOTÃO DE ASSINATURA --- */}
+              {/* BOTÃO DE ASSINATURA */}
               <button 
                 onClick={handleSubscribe} 
                 disabled={loadingCheckout}
                 className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-lg shadow-lg transition-all hover:-translate-y-1 disabled:opacity-70 disabled:cursor-wait"
               >
-                {loadingCheckout ? 'Carregando Pagamento...' : 'Assinar Agora'}
+                {loadingCheckout ? 'Carregando Pagamento...' : 'Começar Teste de 7 Dias'}
               </button>
               
-              <p className="text-center text-xs text-slate-400 mt-4">Não pedimos cartão de crédito no teste.</p>
+              <p className="text-center text-xs text-slate-400 mt-4">Não será cobrado hoje.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* --- FOOTER --- */}
+      {/* FOOTER */}
       <footer className="bg-slate-900 text-slate-300 py-16 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
@@ -383,14 +390,12 @@ export default function LandingPage() {
               <a href="#" className="hover:text-white transition-colors">Suporte</a>
             </div>
             <div className="text-sm text-slate-500">
-              
               © 2025 FastClinic Inc.
             </div>
           </div>
         </div>
       </footer>
       
-      {/* CSS para Animações Extras */}
       <style jsx>{`
         @keyframes blob {
           0% { transform: translate(0px, 0px) scale(1); }
