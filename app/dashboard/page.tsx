@@ -65,6 +65,31 @@ export default function Dashboard() {
   const hour = getHours(new Date());
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
+  // ⭐ FUNÇÃO PARA CALCULAR DIAS RESTANTES (CORRIGIDA)
+  const calculateDaysLeft = (endDateString: string | null): number => {
+    if (!endDateString) return 0;
+    
+    try {
+      // Converte a string para Date
+      const endDate = new Date(endDateString);
+      const today = new Date();
+      
+      // Remove as horas para comparar apenas as datas
+      endDate.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      
+      // Calcula a diferença em dias
+      const diffTime = endDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Retorna 0 se for negativo
+      return Math.max(0, diffDays);
+    } catch (error) {
+      console.error('Erro ao calcular dias restantes:', error);
+      return 0;
+    }
+  };
+
   // --- EFEITOS (Data Fetching) ---
   useEffect(() => {
     async function checkUser() {
@@ -77,7 +102,7 @@ export default function Dashboard() {
       
       setUserId(session.user.id);
       
-      // Busca Perfil + Dados de Assinatura (Importante: Adicionado current_period_end)
+      // Busca Perfil + Dados de Assinatura
       const { data: profileData } = await supabase
         .from('profiles')
         .select('clinic_name, avatar_url, city, subscription_status, current_period_end')
@@ -92,19 +117,30 @@ export default function Dashboard() {
         });
 
         // Lógica de Assinatura: Considera ativo se status for 'active' ou 'trialing'
+        const isActive = ['active', 'trialing'].includes(profileData.subscription_status);
+        
         setSubscription({
-            isActive: ['active', 'trialing'].includes(profileData.subscription_status),
+            isActive: isActive,
             endDate: profileData.current_period_end
         });
+
+        // Debug - remova depois de testar
+        console.log('🔍 DEBUG Assinatura:', {
+          status: profileData.subscription_status,
+          endDate: profileData.current_period_end,
+          isActive: isActive,
+          daysLeft: calculateDaysLeft(profileData.current_period_end)
+        });
+
+        // Só busca dados se estiver ativo
+        if (isActive) {
+          fetchData(currentMonthDate, session.user.id);
+        } else {
+          setLoading(false); 
+        }
       } else {
         setProfile({ clinic_name: 'Minha Clínica', avatar_url: null, city: 'Sua Cidade' });
-      }
-
-      // Só busca dados se estiver ativo
-      if (profileData && ['active', 'trialing'].includes(profileData.subscription_status)) {
-          fetchData(currentMonthDate, session.user.id);
-      } else {
-          setLoading(false); 
+        setLoading(false);
       }
     }
     checkUser();
@@ -114,7 +150,7 @@ export default function Dashboard() {
     if (userId && subscription?.isActive) {
       fetchData(currentMonthDate, userId);
     }
-  }, [currentMonthDate, userId, subscription]);
+  }, [currentMonthDate, userId, subscription?.isActive]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -317,14 +353,14 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* WIDGET DE ASSINATURA */}
-        {subscription && (
+        {/* WIDGET DE ASSINATURA - CORRIGIDO */}
+        {subscription && subscription.isActive && (
             <div className="bg-slate-900 rounded-xl p-4 text-white mb-6 flex items-center justify-between shadow-lg">
             <div>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Sua Assinatura</p>
                 <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-bold text-emerald-400">
-                        {subscription?.endDate ? Math.max(0, differenceInDays(new Date(subscription.endDate), new Date())) : 0}
+                        {calculateDaysLeft(subscription.endDate)}
                     </span>
                     <span className="text-sm text-slate-300">dias restantes</span>
                 </div>
@@ -485,7 +521,7 @@ export default function Dashboard() {
                                 <h3 className="font-bold text-gray-800 text-lg flex flex-wrap items-center gap-2">
                                   {item.patient_name}
                                   
-                                  {/* --- BOTÃO WHATSAPP --- */}
+                                  {/* BOTÃO WHATSAPP */}
                                   {item.patient_phone && (
                                     <button
                                       onClick={(e) => openWhatsApp(e, item.patient_phone, item.patient_name, format(new Date(item.start_time), 'HH:mm'))}
