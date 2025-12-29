@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Se for Login ou Home e JÁ tiver usuário -> Manda pro Dashboard
-  if ((request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login') && user) {
+  if (request.nextUrl.pathname === '/login' && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

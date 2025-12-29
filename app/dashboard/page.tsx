@@ -4,11 +4,11 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-// --- ATENÇÃO: Imports corrigidos com "../" ---
+// Services
 import { getMonthlyAppointments, Appointment } from '../services/appointmentService';
 import { getTransactions, Transaction } from '../services/transactionService';
 
-// Componentes (Corrigidos com "../")
+// Componentes
 import { CalendarWidget } from '../componentes/CalendarWidget';
 import { NewAppointmentModal } from '../componentes/NewAppointmentModal';
 import { NewTransactionModal } from '../componentes/NewTransactionModal';
@@ -18,7 +18,8 @@ import { PatientHistoryModal } from '../componentes/PatientHistoryModal';
 import { FinancialKPIs } from '../componentes/FinancialKPIs';
 import { DocumentModal } from '../componentes/DocumentModal';
 
-import { format, isSameDay, getYear, getMonth, getHours } from 'date-fns';
+// Utils
+import { format, isSameDay, getYear, getMonth, getHours, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { 
@@ -26,10 +27,12 @@ import {
   Cog6ToothIcon,
   CheckBadgeIcon,
   BanknotesIcon,
-  PrinterIcon 
+  PrinterIcon,
+  LockClosedIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 
-export default function Dashboard() { // Mudei o nome de Home para Dashboard
+export default function Dashboard() {
   const router = useRouter();
   
   // --- ESTADOS DE DADOS ---
@@ -47,6 +50,9 @@ export default function Dashboard() { // Mudei o nome de Home para Dashboard
   // Usuário e Perfil
   const [userId, setUserId] = useState<string>('');
   const [profile, setProfile] = useState<{ clinic_name: string, avatar_url: string | null, city: string } | null>(null);
+  
+  // Estado da Assinatura
+  const [subscription, setSubscription] = useState<{ isActive: boolean, endDate: string | null } | null>(null);
 
   // Modais
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -65,16 +71,16 @@ export default function Dashboard() { // Mudei o nome de Home para Dashboard
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        // Se não tiver sessão, manda pro Login
         router.push('/login');
         return;
       } 
       
       setUserId(session.user.id);
       
+      // Busca Perfil + Dados de Assinatura
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('clinic_name, avatar_url, city')
+        .select('clinic_name, avatar_url, city, subscription_status, current_period_end')
         .eq('id', session.user.id)
         .single();
       
@@ -84,24 +90,59 @@ export default function Dashboard() { // Mudei o nome de Home para Dashboard
             avatar_url: profileData.avatar_url,
             city: profileData.city || 'Sua Cidade'
         });
+
+        // Lógica de Assinatura: Considera ativo se status for 'active' ou 'trialing'
+        setSubscription({
+            isActive: ['active', 'trialing'].includes(profileData.subscription_status),
+            endDate: profileData.current_period_end
+        });
       } else {
         setProfile({ clinic_name: 'Minha Clínica', avatar_url: null, city: 'Sua Cidade' });
       }
 
-      fetchData(currentMonthDate, session.user.id);
+      // Só busca dados se estiver ativo (opcional, mas poupa recursos)
+      if (profileData && ['active', 'trialing'].includes(profileData.subscription_status)) {
+          fetchData(currentMonthDate, session.user.id);
+      } else {
+          setLoading(false); // Para parar o loading e mostrar a tela de bloqueio
+      }
     }
     checkUser();
   }, [router]);
 
   useEffect(() => {
-    if (userId) {
+    if (userId && subscription?.isActive) {
       fetchData(currentMonthDate, userId);
     }
-  }, [currentMonthDate, userId]);
+  }, [currentMonthDate, userId, subscription]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/login');
+  }
+
+  // Função para abrir o checkout (recriada aqui para a tela de bloqueio)
+  async function handleSubscribe() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: session.user.id,
+          email: session.user.email
+        })
+      });
+
+      const data = await response.json();
+      if (data.url) window.location.href = data.url;
+      else toast.error("Erro ao iniciar pagamento.");
+      
+    } catch (error) {
+      toast.error("Erro de conexão.");
+    }
   }
 
   async function fetchData(dateToFetch: Date, uid: string) {
@@ -201,6 +242,35 @@ export default function Dashboard() { // Mudei o nome de Home para Dashboard
     window.open(`https://wa.me/55${cleanPhone}?text=${message}`, '_blank');
   }
 
+  // --- BLOQUEIO DE ASSINATURA ---
+  if (!loading && subscription && !subscription.isActive) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-sans">
+         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+               <LockClosedIcon className="w-8 h-8 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Assinatura Expirada</h1>
+            <p className="text-gray-500 mb-8">
+               Para continuar gerenciando seus pacientes e financeiro, reative sua assinatura Premium.
+            </p>
+            
+            <button 
+               onClick={handleSubscribe} 
+               className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg"
+            >
+               <CreditCardIcon className="w-5 h-5" />
+               Assinar Agora
+            </button>
+            
+            <button onClick={handleLogout} className="mt-4 text-sm text-gray-400 hover:text-gray-600 underline">
+               Sair da conta
+            </button>
+         </div>
+      </div>
+    );
+  }
+
   return (
     <main className="bg-gray-50 min-h-screen font-sans text-gray-900 pb-10">
       
@@ -247,6 +317,42 @@ export default function Dashboard() { // Mudei o nome de Home para Dashboard
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
+        {/* WIDGET DE ASSINATURA */}
+        {subscription && (
+            <div className="bg-slate-900 rounded-xl p-4 text-white mb-6 flex items-center justify-between shadow-lg">
+            <div>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Sua Assinatura</p>
+                <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold text-emerald-400">
+                        {subscription?.endDate ? differenceInDays(new Date(subscription.endDate), new Date()) : 0}
+                    </span>
+                    <span className="text-sm text-slate-300">dias restantes</span>
+                </div>
+            </div>
+            
+            <button 
+                onClick={async () => {
+                    const toastId = toast.loading('Carregando portal...');
+                    try {
+                        const res = await fetch('/api/portal', { 
+                            method: 'POST', 
+                            body: JSON.stringify({ userId }) 
+                        });
+                        const data = await res.json();
+                        if (data.url) window.location.href = data.url;
+                        else toast.error('Erro ao abrir portal', { id: toastId });
+                    } catch (e) {
+                        toast.error('Erro de conexão', { id: toastId });
+                    }
+                }}
+                className="bg-white/10 hover:bg-white/20 text-white text-sm px-3 py-2 rounded-lg transition-colors border border-white/10 flex items-center gap-2"
+            >
+                <CreditCardIcon className="w-4 h-4"/>
+                Gerenciar
+            </button>
+            </div>
+        )}
+
         {/* MODAIS */}
         <NewAppointmentModal 
           isOpen={isModalOpen}
@@ -380,7 +486,7 @@ export default function Dashboard() { // Mudei o nome de Home para Dashboard
                                 <h3 className="font-bold text-gray-800 text-lg flex flex-wrap items-center gap-2">
                                   {item.patient_name}
                                   
-                                  {/* --- BOTÃO WHATSAPP MELHORADO --- */}
+                                  {/* --- BOTÃO WHATSAPP --- */}
                                   {item.patient_phone && (
                                     <button
                                       onClick={(e) => openWhatsApp(e, item.patient_phone, item.patient_name, format(new Date(item.start_time), 'HH:mm'))}
