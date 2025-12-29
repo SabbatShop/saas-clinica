@@ -27,11 +27,21 @@ export async function POST(req: Request) {
 
   const session = event.data.object as any;
 
+  // Função auxiliar para formatar a data de forma segura
+  const formatDate = (timestamp: number | null | undefined) => {
+    if (!timestamp) return new Date().toISOString(); // Fallback para agora se não vier data
+    try {
+      return new Date(timestamp * 1000).toISOString();
+    } catch (e) {
+      return new Date().toISOString();
+    }
+  };
+
   try {
     // 1. CHECKOUT COMPLETADO
     if (event.type === 'checkout.session.completed') {
       const subscriptionId = session.subscription as string;
-      if (!subscriptionId) throw new Error("Subscription ID missing in checkout.session.completed");
+      if (!subscriptionId) throw new Error("Subscription ID missing");
 
       const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
       const userId = session.metadata.userId;
@@ -45,35 +55,35 @@ export async function POST(req: Request) {
           plan_type: 'pro',
           stripe_customer_id: session.customer,
           stripe_subscription_id: subscriptionId,
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_end: formatDate(subscription.current_period_end),
         })
         .eq('id', userId);
 
         if (error) throw error;
+        console.log(`✅ Checkout processado para o usuário ${userId}`);
     }
 
     // 2. ATUALIZAÇÃO OU RENOVAÇÃO
     if (event.type === 'customer.subscription.updated' || event.type === 'invoice.payment_succeeded') {
-      // No invoice.payment_succeeded o ID vem em session.subscription
-      // No customer.subscription.updated o ID vem em session.id
       const subscriptionId = (event.type === 'invoice.payment_succeeded' ? session.subscription : session.id) as string;
 
       if (subscriptionId) {
         const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
         
-        await supabaseAdmin
+        const { error } = await supabaseAdmin
           .from('profiles')
           .update({
             subscription_status: subscription.status,
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            current_period_end: formatDate(subscription.current_period_end),
           })
           .eq('stripe_subscription_id', subscriptionId);
+        
+        if (error) console.error('❌ Erro Supabase Update:', error.message);
       }
     }
 
     // 3. CANCELAMENTO
     if (event.type === 'customer.subscription.deleted') {
-      // No cancelamento, o ID da assinatura é o próprio ID do objeto retornado
       const subscriptionId = session.id as string;
 
       await supabaseAdmin
