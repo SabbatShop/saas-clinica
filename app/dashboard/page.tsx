@@ -77,7 +77,7 @@ export default function Dashboard() {
       
       setUserId(session.user.id);
       
-      // Busca Perfil + Dados de Assinatura
+      // Busca Perfil + Dados de Assinatura (Importante: Adicionado current_period_end)
       const { data: profileData } = await supabase
         .from('profiles')
         .select('clinic_name, avatar_url, city, subscription_status, current_period_end')
@@ -100,11 +100,11 @@ export default function Dashboard() {
         setProfile({ clinic_name: 'Minha Clínica', avatar_url: null, city: 'Sua Cidade' });
       }
 
-      // Só busca dados se estiver ativo (opcional, mas poupa recursos)
+      // Só busca dados se estiver ativo
       if (profileData && ['active', 'trialing'].includes(profileData.subscription_status)) {
           fetchData(currentMonthDate, session.user.id);
       } else {
-          setLoading(false); // Para parar o loading e mostrar a tela de bloqueio
+          setLoading(false); 
       }
     }
     checkUser();
@@ -121,7 +121,7 @@ export default function Dashboard() {
     router.push('/login');
   }
 
-  // Função para abrir o checkout (recriada aqui para a tela de bloqueio)
+  // Função para abrir o checkout
   async function handleSubscribe() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -324,7 +324,7 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Sua Assinatura</p>
                 <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-bold text-emerald-400">
-                        {subscription?.endDate ? differenceInDays(new Date(subscription.endDate), new Date()) : 0}
+                        {subscription?.endDate ? Math.max(0, differenceInDays(new Date(subscription.endDate), new Date())) : 0}
                     </span>
                     <span className="text-sm text-slate-300">dias restantes</span>
                 </div>
@@ -335,12 +335,11 @@ export default function Dashboard() {
                     const toastId = toast.loading('Carregando portal...');
                     try {
                         const res = await fetch('/api/portal', { 
-                            method: 'POST', 
-                            body: JSON.stringify({ userId }) 
+                            method: 'POST'
                         });
                         const data = await res.json();
                         if (data.url) window.location.href = data.url;
-                        else toast.error('Erro ao abrir portal', { id: toastId });
+                        else toast.error(data.error || 'Erro ao abrir portal', { id: toastId });
                     } catch (e) {
                         toast.error('Erro de conexão', { id: toastId });
                     }
