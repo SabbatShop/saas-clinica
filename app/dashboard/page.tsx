@@ -19,7 +19,7 @@ import { FinancialKPIs } from '../componentes/FinancialKPIs';
 import { DocumentModal } from '../componentes/DocumentModal';
 
 // Utils
-import { format, isSameDay, getYear, getMonth, getHours, differenceInDays, startOfDay } from 'date-fns';
+import { format, isSameDay, getYear, getMonth, getHours, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { 
@@ -77,7 +77,7 @@ export default function Dashboard() {
       
       setUserId(session.user.id);
       
-      // Busca Perfil + Dados de Assinatura
+      // Busca Perfil + Dados de Assinatura (Importante: Adicionado current_period_end)
       const { data: profileData } = await supabase
         .from('profiles')
         .select('clinic_name, avatar_url, city, subscription_status, current_period_end')
@@ -91,17 +91,16 @@ export default function Dashboard() {
             city: profileData.city || 'Sua Cidade'
         });
 
-        // CORREÇÃO: Verifica se a data existe e é válida
-        const expiryDate = profileData.current_period_end ? profileData.current_period_end : null;
-
+        // Lógica de Assinatura: Considera ativo se status for 'active' ou 'trialing'
         setSubscription({
             isActive: ['active', 'trialing'].includes(profileData.subscription_status),
-            endDate: expiryDate
+            endDate: profileData.current_period_end
         });
       } else {
         setProfile({ clinic_name: 'Minha Clínica', avatar_url: null, city: 'Sua Cidade' });
       }
 
+      // Só busca dados se estiver ativo
       if (profileData && ['active', 'trialing'].includes(profileData.subscription_status)) {
           fetchData(currentMonthDate, session.user.id);
       } else {
@@ -109,7 +108,7 @@ export default function Dashboard() {
       }
     }
     checkUser();
-  }, [router, currentMonthDate]);
+  }, [router]);
 
   useEffect(() => {
     if (userId && subscription?.isActive) {
@@ -122,6 +121,7 @@ export default function Dashboard() {
     router.push('/login');
   }
 
+  // Função para abrir o checkout
   async function handleSubscribe() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -171,6 +171,7 @@ export default function Dashboard() {
     setCurrentMonthDate(newDate);
   }
 
+  // --- CÁLCULOS FINANCEIROS (MENSAL) ---
   const financialTotals = useMemo(() => {
     const revenueFromAppointments = agendamentos
       .filter(app => app.status === 'concluido')
@@ -190,6 +191,8 @@ export default function Dashboard() {
     };
   }, [agendamentos, transacoes]);
 
+
+  // --- HELPERS VISUAIS (Diário) ---
   const todayAppointments = agendamentos.filter(app => isSameDay(new Date(app.start_time), selectedDate));
   
   const displayedAppointments = searchTerm 
@@ -216,17 +219,30 @@ export default function Dashboard() {
 
   function openWhatsApp(e: React.MouseEvent, phone: string | undefined, patientName: string, startTime: string) {
     e.stopPropagation(); 
+    
     if (!phone) {
         toast.error("Paciente sem telefone cadastrado.");
         return;
     }
+    
     const cleanPhone = phone.replace(/\D/g, ''); 
     const dateFormatted = format(new Date(selectedDate), "dd/MM", { locale: ptBR });
     const clinicName = profile?.clinic_name || 'Consultório';
-    const message = `Olá, *${patientName}*! Tudo bem? 👋%0a%0aAqui é da *${clinicName}*.%0a%0aGostaríamos de confirmar sua consulta para:%0a📅 Data: *${dateFormatted}*%0a⏰ Horário: *${startTime}*%0a%0aPodemos confirmar?`;
+
+    const message = `Olá, *${patientName}*! Tudo bem? 👋` +
+      `%0a%0a` + 
+      `Aqui é da *${clinicName}*.` +
+      `%0a%0a` +
+      `Gostaríamos de confirmar sua consulta para:` +
+      `%0a📅 Data: *${dateFormatted}*` +
+      `%0a⏰ Horário: *${startTime}*` +
+      `%0a%0a` +
+      `Podemos confirmar?`;
+
     window.open(`https://wa.me/55${cleanPhone}?text=${message}`, '_blank');
   }
 
+  // --- BLOQUEIO DE ASSINATURA ---
   if (!loading && subscription && !subscription.isActive) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-sans">
@@ -235,11 +251,21 @@ export default function Dashboard() {
                <LockClosedIcon className="w-8 h-8 text-red-600" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Assinatura Expirada</h1>
-            <p className="text-gray-500 mb-8">Para continuar gerenciando seus pacientes e financeiro, reative sua assinatura Premium.</p>
-            <button onClick={handleSubscribe} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg">
-               <CreditCardIcon className="w-5 h-5" /> Assinar Agora
+            <p className="text-gray-500 mb-8">
+               Para continuar gerenciando seus pacientes e financeiro, reative sua assinatura Premium.
+            </p>
+            
+            <button 
+               onClick={handleSubscribe} 
+               className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg"
+            >
+               <CreditCardIcon className="w-5 h-5" />
+               Assinar Agora
             </button>
-            <button onClick={handleLogout} className="mt-4 text-sm text-gray-400 hover:text-gray-600 underline">Sair da conta</button>
+            
+            <button onClick={handleLogout} className="mt-4 text-sm text-gray-400 hover:text-gray-600 underline">
+               Sair da conta
+            </button>
          </div>
       </div>
     );
@@ -247,6 +273,8 @@ export default function Dashboard() {
 
   return (
     <main className="bg-gray-50 min-h-screen font-sans text-gray-900 pb-10">
+      
+      {/* HEADER */}
       <header className="bg-white sticky top-0 z-30 shadow-sm mb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -254,44 +282,61 @@ export default function Dashboard() {
                {profile?.avatar_url ? (
                  <img src={profile.avatar_url} alt="Logo" className="w-full h-full object-cover"/>
                ) : (
-                 <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white font-bold">{profile?.clinic_name?.charAt(0) || 'C'}</div>
+                 <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white font-bold">
+                   {profile?.clinic_name?.charAt(0) || 'C'}
+                 </div>
                )}
              </div>
              <div>
-                <h1 className="text-sm font-bold text-gray-900 leading-tight">{profile?.clinic_name || 'Minha Clínica'}</h1>
+                <h1 className="text-sm font-bold text-gray-900 leading-tight">
+                  {profile?.clinic_name || 'Minha Clínica'}
+                </h1>
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Painel Médico</p>
              </div>
           </div>
+
           <div className="flex items-center gap-2 md:gap-4">
              <div className="hidden md:flex flex-col items-end mr-2">
                 <span className="text-sm font-medium text-gray-700">{greeting}</span>
                 <span className="text-xs text-gray-400">{format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}</span>
              </div>
-             <button title="Gestão Financeira" onClick={() => router.push('/financeiro')} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"><BanknotesIcon className="w-6 h-6" /></button>
-             <button title="Configurações" onClick={() => router.push('/configuracoes')} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"><Cog6ToothIcon className="w-6 h-6" /></button>
-             <button title="Sair" onClick={handleLogout} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"><ArrowRightOnRectangleIcon className="w-6 h-6" /></button>
+             
+             <button title="Gestão Financeira" onClick={() => router.push('/financeiro')} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all">
+                <BanknotesIcon className="w-6 h-6" />
+             </button>
+
+             <button title="Configurações" onClick={() => router.push('/configuracoes')} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all">
+                <Cog6ToothIcon className="w-6 h-6" />
+             </button>
+             <button title="Sair" onClick={handleLogout} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all">
+                <ArrowRightOnRectangleIcon className="w-6 h-6" />
+             </button>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* WIDGET DE ASSINATURA */}
         {subscription && (
             <div className="bg-slate-900 rounded-xl p-4 text-white mb-6 flex items-center justify-between shadow-lg">
             <div>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Sua Assinatura</p>
                 <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-bold text-emerald-400">
-                        {/* CORREÇÃO NO CÁLCULO DOS DIAS: Força o uso do início do dia para comparação justa */}
-                        {subscription?.endDate ? Math.max(0, differenceInDays(startOfDay(new Date(subscription.endDate)), startOfDay(new Date()))) : 0}
+                        {subscription?.endDate ? Math.max(0, differenceInDays(new Date(subscription.endDate), new Date())) : 0}
                     </span>
                     <span className="text-sm text-slate-300">dias restantes</span>
                 </div>
             </div>
+            
             <button 
                 onClick={async () => {
                     const toastId = toast.loading('Carregando portal...');
                     try {
-                        const res = await fetch('/api/portal', { method: 'POST' });
+                        const res = await fetch('/api/portal', { 
+                            method: 'POST'
+                        });
                         const data = await res.json();
                         if (data.url) window.location.href = data.url;
                         else toast.error(data.error || 'Erro ao abrir portal', { id: toastId });
@@ -301,12 +346,47 @@ export default function Dashboard() {
                 }}
                 className="bg-white/10 hover:bg-white/20 text-white text-sm px-3 py-2 rounded-lg transition-colors border border-white/10 flex items-center gap-2"
             >
-                <CreditCardIcon className="w-4 h-4"/> Gerenciar
+                <CreditCardIcon className="w-4 h-4"/>
+                Gerenciar
             </button>
             </div>
         )}
 
+        {/* MODAIS */}
+        <NewAppointmentModal 
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); setEditingAppointment(null); }}
+          selectedDate={selectedDate}
+          appointmentToEdit={editingAppointment}
+          onSuccess={() => fetchData(currentMonthDate, userId)}
+          currentUserId={userId}
+        />
+        
+        <NewTransactionModal 
+          isOpen={isTransactionModalOpen}
+          onClose={() => setIsTransactionModalOpen(false)}
+          onSuccess={() => fetchData(currentMonthDate, userId)}
+          currentUserId={userId}
+        />
+
+        <PatientHistoryModal 
+          isOpen={!!historyPatientName}
+          onClose={() => setHistoryPatientName(null)}
+          patientName={historyPatientName || ''}
+          currentUserId={userId}
+        />
+
+        <DocumentModal 
+          isOpen={!!documentPatient} 
+          onClose={() => setDocumentPatient(null)} 
+          patientName={documentPatient || ''}
+          clinicName={profile?.clinic_name || 'Minha Clínica'}
+          city={profile?.city || 'Cidade'}
+        />
+
         <div className="flex flex-col lg:flex-row gap-8">
+          
+          {/* COLUNA ESQUERDA */}
           <div className="w-full lg:w-[360px] flex-shrink-0 space-y-6">
             <CalendarWidget 
               appointments={agendamentos} 
@@ -318,70 +398,152 @@ export default function Dashboard() {
             <RevenueChart appointments={agendamentos} currentDate={currentMonthDate} />
           </div>
 
+          {/* COLUNA DIREITA */}
           <div className="flex-1 min-w-0">
-            {!searchTerm && <FinancialKPIs totalRevenue={financialTotals.totalRevenue} totalExpenses={financialTotals.totalExpenses} />}
+            
+            {!searchTerm && (
+              <FinancialKPIs 
+                totalRevenue={financialTotals.totalRevenue} 
+                totalExpenses={financialTotals.totalExpenses} 
+              />
+            )}
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{searchTerm ? 'Resultados da busca' : format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}</h2>
-                <p className="text-gray-500 text-sm mt-1">{searchTerm ? `Filtrando por "${searchTerm}"` : 'Visão geral do dia.'}</p>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {searchTerm ? 'Resultados da busca' : format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+                </h2>
+                <p className="text-gray-500 text-sm mt-1">
+                  {searchTerm ? `Filtrando por "${searchTerm}"` : 'Visão geral do dia.'}
+                </p>
               </div>
+              
               <div className="flex w-full sm:w-auto gap-2 flex-wrap sm:flex-nowrap">
-                <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Buscar paciente..." />
-                <button onClick={() => setIsTransactionModalOpen(true)} className="flex-1 sm:flex-none bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-xl font-semibold shadow-sm text-sm">$ Lançar Conta</button>
-                <button onClick={() => { setEditingAppointment(null); setIsModalOpen(true); }} className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold shadow-lg shadow-blue-200 flex items-center justify-center gap-2 text-sm"><span>+ Agendar</span></button>
+                <div className="w-full sm:w-auto">
+                    <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Buscar paciente..." />
+                </div>
+                
+                <button 
+                  onClick={() => setIsTransactionModalOpen(true)}
+                  className="flex-1 sm:flex-none bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-xl font-semibold shadow-sm transition-all text-sm whitespace-nowrap"
+                >
+                  $ Lançar Conta
+                </button>
+
+                <button 
+                  onClick={() => { setEditingAppointment(null); setIsModalOpen(true); }}
+                  className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 text-sm whitespace-nowrap"
+                >
+                  <span>+ Agendar</span>
+                </button>
               </div>
             </div>
 
+            {/* LISTA (TIMELINE) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 min-h-[500px] p-6 relative">
+              
               {loading ? (
                 <div className="flex justify-center items-center h-40"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
               ) : displayedAppointments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-96 text-center">
-                  <CheckBadgeIcon className="w-16 h-16 text-gray-200 mb-4" />
+                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                     <CheckBadgeIcon className="w-8 h-8 text-gray-300" />
+                  </div>
                   <h3 className="text-lg font-medium text-gray-900">Agenda Livre</h3>
-                  <p className="text-gray-500 text-sm mt-2">{searchTerm ? "Nenhum resultado." : "Nenhum paciente para este dia."}</p>
+                  <p className="text-gray-500 text-sm max-w-xs mx-auto mt-2">
+                    {searchTerm ? "Nenhum resultado." : "Nenhum paciente para este dia."}
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {displayedAppointments.map((item) => (
-                    <div key={item.id} className="relative flex flex-col sm:flex-row group animate-in slide-in-from-bottom-2 duration-500">
-                      <div className="sm:w-16 flex-shrink-0 flex sm:flex-col items-center sm:items-end sm:pr-6 mb-2 sm:mb-0 gap-2 sm:gap-0">
-                        <span className="text-sm font-bold text-gray-900">{format(new Date(item.start_time), 'HH:mm')}</span>
-                        <span className="text-xs text-gray-400">{format(new Date(item.end_time), 'HH:mm')}</span>
-                      </div>
-                      <div onClick={() => { setEditingAppointment(item); setIsModalOpen(true); }} className="flex-1 bg-white border border-gray-100 rounded-xl p-4 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-bold text-gray-800 text-lg flex flex-wrap items-center gap-2">
-                              {item.patient_name}
-                              {item.patient_phone && (
-                                <button onClick={(e) => openWhatsApp(e, item.patient_phone, item.patient_name, format(new Date(item.start_time), 'HH:mm'))} className="text-green-700 bg-green-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">WhatsApp</button>
-                              )}
-                            </h3>
-                            <div className="mt-3 flex gap-2">
-                              <button onClick={(e) => { e.stopPropagation(); setHistoryPatientName(item.patient_name); }} className="text-xs font-medium text-blue-600 hover:underline">Ver Prontuário &rarr;</button>
-                              <button onClick={(e) => { e.stopPropagation(); setDocumentPatient(item.patient_name); }} className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1"><PrinterIcon className="w-3 h-3" /> Documentos</button>
+                <div className="relative">
+                  <div className="absolute left-[59px] top-4 bottom-4 w-0.5 bg-gray-100 hidden sm:block"></div>
+                  <div className="space-y-6">
+                    {displayedAppointments.map((item) => {
+                       const statusColor = getStatusColor(item.status);
+                       const dotColor = getStatusDot(item.status);
+
+                       return (
+                        <div key={item.id} className="relative flex flex-col sm:flex-row group animate-in slide-in-from-bottom-2 duration-500">
+                          
+                          <div className="sm:w-16 flex-shrink-0 flex sm:flex-col items-center sm:items-end sm:pr-6 mb-2 sm:mb-0 gap-2 sm:gap-0">
+                            <span className="text-sm font-bold text-gray-900">
+                              {format(new Date(item.start_time), 'HH:mm')}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {format(new Date(item.end_time), 'HH:mm')}
+                            </span>
+                          </div>
+
+                          <div className={`absolute left-[55px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-white ring-1 ring-gray-200 hidden sm:block z-10 ${dotColor}`}></div>
+
+                          <div 
+                            onClick={() => { setEditingAppointment(item); setIsModalOpen(true); }}
+                            className="flex-1 bg-white border border-gray-100 rounded-xl p-4 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group-hover:translate-x-1"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="font-bold text-gray-800 text-lg flex flex-wrap items-center gap-2">
+                                  {item.patient_name}
+                                  
+                                  {/* --- BOTÃO WHATSAPP --- */}
+                                  {item.patient_phone && (
+                                    <button
+                                      onClick={(e) => openWhatsApp(e, item.patient_phone, item.patient_name, format(new Date(item.start_time), 'HH:mm'))}
+                                      className="flex items-center gap-1 text-green-700 bg-green-100 hover:bg-green-200 border border-green-200 px-3 py-1.5 rounded-lg transition-all"
+                                      title="Chamar no WhatsApp"
+                                    >
+                                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2z"/>
+                                      </svg>
+                                      <span className="text-xs font-bold">WhatsApp</span>
+                                    </button>
+                                  )}
+                                </h3>
+                                
+                                {item.notes && (
+                                  <p className="text-sm text-gray-500 mt-1 bg-gray-50 inline-block px-2 py-1 rounded-md border border-gray-100">
+                                    📝 {item.notes}
+                                  </p>
+                                )}
+                                
+                                <div className="mt-3 flex gap-2">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setHistoryPatientName(item.patient_name); }}
+                                    className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                                  >
+                                    Ver Prontuário &rarr;
+                                  </button>
+
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); setDocumentPatient(item.patient_name); }}
+                                    className="text-xs font-medium text-gray-500 hover:text-gray-800 hover:underline flex items-center gap-1"
+                                  >
+                                    <PrinterIcon className="w-3 h-3" />
+                                    Documentos
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-end gap-2">
+                                <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-full border ${statusColor}`}>
+                                  {item.status}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-600">
+                                  {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <span className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded-full border ${getStatusColor(item.status)}`}>{item.status}</span>
-                            <span className="text-sm font-semibold text-gray-600">{item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
+                       );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
-
-      <NewAppointmentModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingAppointment(null); }} selectedDate={selectedDate} appointmentToEdit={editingAppointment} onSuccess={() => fetchData(currentMonthDate, userId)} currentUserId={userId} />
-      <NewTransactionModal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} onSuccess={() => fetchData(currentMonthDate, userId)} currentUserId={userId} />
-      <PatientHistoryModal isOpen={!!historyPatientName} onClose={() => setHistoryPatientName(null)} patientName={historyPatientName || ''} currentUserId={userId} />
-      <DocumentModal isOpen={!!documentPatient} onClose={() => setDocumentPatient(null)} patientName={documentPatient || ''} clinicName={profile?.clinic_name || 'Minha Clínica'} city={profile?.city || 'Cidade'} />
     </main>
   );
 }
